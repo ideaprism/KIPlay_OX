@@ -1,0 +1,179 @@
+{
+  "_note": "MVP 임시 문제 은행. 정통 문항(특허법·지식재산)은 사실 확인을 마친 것만 담았고, 사내 가십 문항은 실제 사내 사실로 교체해야 한다. 자동 출제 파이프라인 연동 시 이 파일이 그대로 대체된다.",
+  "_schema": {
+    "id": "고유 ID",
+    "text": "문항 본문",
+    "answer": "O 또는 X",
+    "difficulty": "easy | medium | hard",
+    "category": "patent-law | ip-news | trivia | office",
+    "source": "근거 출처 (title, url)",
+    "evidence": "근거 원문 문장. 파이프라인에서 이 값이 없는 문항은 자동 폐기한다."
+  },
+
+  "pool": [
+    {
+      "id": "q-easy-01",
+      "text": "한국특허정보원의 영문 약자는 KIPI다.",
+      "answer": "O",
+      "difficulty": "easy",
+      "category": "office",
+      "source": { "title": "한국특허정보원 기관 소개", "url": null },
+      "evidence": "Korea Institute of Patent Information."
+    },
+    {
+      "id": "q-easy-02",
+      "text": "대한민국 특허청은 대전에 있다.",
+      "answer": "O",
+      "difficulty": "easy",
+      "category": "trivia",
+      "source": { "title": "특허청 청사 안내", "url": null },
+      "evidence": "특허청은 정부대전청사에 위치한다."
+    },
+    {
+      "id": "q-easy-03",
+      "text": "특허권의 존속기간은 출원일로부터 20년이다.",
+      "answer": "O",
+      "difficulty": "easy",
+      "category": "patent-law",
+      "source": { "title": "특허법 제88조", "url": null },
+      "evidence": "특허권의 존속기간은 특허출원일 후 20년이 되는 날까지로 한다."
+    },
+    {
+      "id": "q-easy-04",
+      "text": "코카콜라의 제조법은 특허로 등록되어 있다.",
+      "answer": "X",
+      "difficulty": "easy",
+      "category": "trivia",
+      "source": { "title": "영업비밀과 특허의 차이", "url": null },
+      "evidence": "코카콜라 제조법은 특허가 아닌 영업비밀로 보호된다. 특허는 공개를 전제로 하기 때문이다."
+    },
+    {
+      "id": "q-easy-05",
+      "text": "특허 문서에서 권리 범위를 결정하는 가장 중요한 부분은 '청구범위'다.",
+      "answer": "O",
+      "difficulty": "easy",
+      "category": "patent-law",
+      "source": { "title": "특허법 제97조", "url": null },
+      "evidence": "특허발명의 보호범위는 청구범위에 적혀 있는 사항에 의하여 정하여진다."
+    },
+
+    {
+      "id": "q-med-01",
+      "text": "특허출원은 원칙적으로 출원일부터 1년 6개월이 지나면 공개된다.",
+      "answer": "O",
+      "difficulty": "medium",
+      "category": "patent-law",
+      "source": { "title": "특허법 제64조 출원공개", "url": null },
+      "evidence": "특허출원일부터 1년 6개월이 지난 후 출원공개한다."
+    },
+    {
+      "id": "q-med-02",
+      "text": "세계 최초의 특허법은 영국에서 만들어졌다.",
+      "answer": "X",
+      "difficulty": "medium",
+      "category": "trivia",
+      "source": { "title": "베네치아 특허법(1474)", "url": null },
+      "evidence": "근대적 의미의 최초 특허법은 1474년 이탈리아 베네치아 공화국에서 제정되었다."
+    },
+    {
+      "id": "q-med-03",
+      "text": "상표권은 갱신을 통해 사실상 반영구적으로 유지할 수 있다.",
+      "answer": "O",
+      "difficulty": "medium",
+      "category": "patent-law",
+      "source": { "title": "상표법 제83조", "url": null },
+      "evidence": "상표권의 존속기간은 10년이며, 갱신등록신청에 의하여 10년씩 갱신할 수 있다."
+    },
+    {
+      "id": "q-med-04",
+      "text": "실용신안권의 존속기간은 특허권보다 짧다.",
+      "answer": "O",
+      "difficulty": "medium",
+      "category": "patent-law",
+      "source": { "title": "실용신안법 제22조", "url": null },
+      "evidence": "실용신안권의 존속기간은 출원일 후 10년으로, 특허권의 20년보다 짧다."
+    },
+    {
+      "id": "q-med-05",
+      "text": "'patent'라는 영어 단어의 어원은 '열려 있는'이라는 뜻이다.",
+      "answer": "O",
+      "difficulty": "medium",
+      "category": "trivia",
+      "source": { "title": "letters patent 어원", "url": null },
+      "evidence": "라틴어 patere(열려 있다)에서 유래했으며, 공개된 문서를 뜻하는 letters patent가 어원이다."
+    },
+
+    {
+      "id": "q-hard-01",
+      "text": "PCT 국제출원을 하면 지정한 모든 국가에 자동으로 특허가 등록된다.",
+      "answer": "X",
+      "difficulty": "hard",
+      "category": "patent-law",
+      "source": { "title": "특허협력조약(PCT) 제도 안내", "url": null },
+      "evidence": "PCT는 국제출원 절차일 뿐이며, 권리 획득을 위해서는 각 지정국의 국내단계 진입과 개별 심사가 필요하다."
+    },
+    {
+      "id": "q-hard-02",
+      "text": "특허 심사청구는 출원일부터 5년 이내에 해야 한다.",
+      "answer": "X",
+      "difficulty": "hard",
+      "category": "patent-law",
+      "source": { "title": "특허법 제59조", "url": null },
+      "evidence": "심사청구 기간은 2017년 3월 1일 이후 출원부터 출원일로부터 3년으로 단축되었다."
+    },
+    {
+      "id": "q-hard-03",
+      "text": "비행기를 발명한 라이트 형제는 특허를 받지 못했다.",
+      "answer": "X",
+      "difficulty": "hard",
+      "category": "trivia",
+      "source": { "title": "US Patent 821,393", "url": null },
+      "evidence": "라이트 형제는 1906년 비행기계에 대한 미국 특허 821,393호를 취득했다."
+    },
+    {
+      "id": "q-hard-04",
+      "text": "조약에 따른 우선권 주장 기간은 특허의 경우 12개월이다.",
+      "answer": "O",
+      "difficulty": "hard",
+      "category": "patent-law",
+      "source": { "title": "파리조약 제4조", "url": null },
+      "evidence": "특허 및 실용신안은 12개월, 디자인 및 상표는 6개월의 우선권 주장 기간이 인정된다."
+    },
+    {
+      "id": "q-hard-05",
+      "text": "아이디어만 떠올려도 특허로 등록받을 수 있다.",
+      "answer": "X",
+      "difficulty": "hard",
+      "category": "patent-law",
+      "source": { "title": "특허법 제42조 명세서 기재요건", "url": null },
+      "evidence": "통상의 기술자가 실시할 수 있을 정도로 명확하고 상세하게 기재해야 하므로, 구체화되지 않은 착상만으로는 등록될 수 없다."
+    }
+  ],
+
+  "sudden": [
+    {
+      "id": "sd-01",
+      "text": "발명왕 에디슨이 생전에 취득한 미국 특허는 모두 몇 건일까?",
+      "answer": 1093,
+      "unit": "건",
+      "source": { "title": "미국 특허청 기록", "url": null },
+      "evidence": "토머스 에디슨은 미국에서 1,093건의 특허를 취득했다."
+    },
+    {
+      "id": "sd-02",
+      "text": "근대적 의미의 세계 최초 특허법이 제정된 해는 몇 년일까?",
+      "answer": 1474,
+      "unit": "년",
+      "source": { "title": "베네치아 특허법", "url": null },
+      "evidence": "1474년 베네치아 공화국이 발명자에게 독점권을 부여하는 최초의 특허법을 제정했다."
+    },
+    {
+      "id": "sd-03",
+      "text": "대한민국 특허청이 개청한 해는 몇 년일까?",
+      "answer": 1977,
+      "unit": "년",
+      "source": { "title": "특허청 연혁", "url": null },
+      "evidence": "특허청은 1977년 3월 상공부 특허국에서 승격·개청했다."
+    }
+  ]
+}

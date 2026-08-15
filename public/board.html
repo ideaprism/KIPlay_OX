@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>12:55 — 전광판</title>
+<link rel="stylesheet" href="style.css">
+<style>
+/* ═══════════════════════════════════════════════════════════
+   전광판 — 가독성이 분위기를 이긴다.
+   하드 그리드 라인, 낮은 라운딩, 그림자 최소, 글로우 금지.
+   기준은 사무실 3m 거리 판독. 200% 확대에서도 깨지지 않아야 한다.
+   ═══════════════════════════════════════════════════════════ */
+
+body { overflow: hidden; }
+.guides { display: none; }
+
+.board {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  grid-template-columns: 1fr minmax(280px, 24vw);
+  grid-template-areas: "head head" "main side";
+  background: var(--ground);
+}
+
+/* ── 헤더 */
+.bhead {
+  grid-area: head;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 18px clamp(20px, 2.4vw, 40px);
+  border-bottom: 2px solid var(--line-2);
+}
+
+.bhead .logo {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(28px, 3vw, 44px);
+  font-weight: 700;
+  letter-spacing: -0.045em;
+}
+
+.bhead .logo .colon { color: var(--amber); }
+
+.bhead .meta {
+  display: flex;
+  gap: clamp(16px, 2vw, 36px);
+  align-items: baseline;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.bhead .meta div { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.bhead .meta .k { font-size: clamp(10px, 0.8vw, 13px); letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-3); }
+.bhead .meta .v { font-size: clamp(20px, 2vw, 30px); font-weight: 700; letter-spacing: -0.03em; }
+
+.vip-flag {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border: 2px solid var(--amber);
+  color: var(--amber);
+  font-weight: 700;
+  font-size: clamp(13px, 1.2vw, 18px);
+}
+
+.vip-flag[data-alive="false"] { border-color: var(--out); color: var(--out); }
+
+/* ── 본문 */
+.bmain {
+  grid-area: main;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: clamp(20px, 3vh, 44px);
+  padding: clamp(20px, 3vw, 56px);
+  min-width: 0;
+}
+
+.bq {
+  font-size: clamp(28px, 3.6vw, 62px);
+  font-weight: 700;
+  line-height: 1.32;
+  letter-spacing: -0.025em;
+  margin: 0;
+  text-wrap: balance;
+}
+
+.bcount { display: flex; align-items: baseline; gap: clamp(14px, 1.6vw, 28px); }
+
+.bcount .n {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(76px, 13vw, 220px);
+  font-weight: 700;
+  line-height: 0.86;
+  letter-spacing: -0.055em;
+  color: var(--live);
+}
+
+.bcount .k {
+  font-family: var(--mono);
+  font-size: clamp(14px, 1.3vw, 22px);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.bcount .drop {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(20px, 2vw, 34px);
+  font-weight: 700;
+  color: var(--out);
+}
+
+/* ── 집계 */
+.btally { display: flex; flex-direction: column; gap: 12px; }
+
+.brow { display: grid; grid-template-columns: 54px 1fr 130px; gap: 16px; align-items: center; }
+
+.brow .g {
+  font-family: var(--mono);
+  font-size: clamp(28px, 2.6vw, 44px);
+  font-weight: 700;
+  line-height: 1;
+}
+
+.brow .track { height: clamp(22px, 2.4vh, 38px); background: var(--surface-2); overflow: hidden; }
+
+.brow .fill {
+  height: 100%;
+  width: 0%;
+  background: var(--ink-2);
+  transition: width 260ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.brow.x .fill { background: var(--surface-3); }
+.brow.hit .fill { background: var(--live); }
+.brow.miss .fill { background: var(--out); opacity: 0.55; }
+
+.brow .n {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(22px, 2.2vw, 38px);
+  font-weight: 700;
+  text-align: right;
+  letter-spacing: -0.03em;
+}
+
+/* ── 타이머 (하드 바) */
+.btimer { height: 10px; background: var(--surface-2); overflow: hidden; }
+.btimer .fill { height: 100%; background: var(--amber); transform-origin: left center; }
+.btimer.urgent .fill { background: var(--out); }
+
+/* ── 사이드 피드 */
+.bside {
+  grid-area: side;
+  border-left: 2px solid var(--line-2);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.bside h2 {
+  margin: 0;
+  padding: 16px 20px;
+  font-family: var(--mono);
+  font-size: clamp(11px, 0.9vw, 14px);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  border-bottom: 1px solid var(--line);
+  font-weight: 600;
+}
+
+.feed { flex: 1; overflow: hidden; display: flex; flex-direction: column-reverse; justify-content: flex-end; }
+
+.feed-item {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 11px 20px;
+  border-bottom: 1px solid var(--line);
+  font-size: clamp(14px, 1.1vw, 19px);
+  animation: slidein 300ms cubic-bezier(0.215, 0.61, 0.355, 1);
+}
+
+@keyframes slidein { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: none; } }
+
+.feed-item .nm { font-weight: 700; }
+.feed-item .dp { color: var(--ink-3); font-size: 0.82em; }
+.feed-item .q { margin-left: auto; font-family: var(--mono); font-size: 0.8em; color: var(--ink-3); }
+.feed-item.revived { color: var(--live); }
+.feed-item.vip .nm { color: var(--amber); }
+
+/* ── 대기 / 결과 오버레이 */
+.bcenter {
+  grid-area: main;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: clamp(12px, 2vh, 28px);
+  padding: clamp(20px, 3vw, 56px);
+  text-align: center;
+}
+
+.bcenter .huge {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(88px, 17vw, 300px);
+  font-weight: 700;
+  line-height: 0.86;
+  letter-spacing: -0.055em;
+  color: var(--amber);
+}
+
+.bcenter .champ-name {
+  font-size: clamp(48px, 8vw, 128px);
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1.02;
+}
+
+.bcenter .sub { font-size: clamp(16px, 1.6vw, 28px); color: var(--ink-2); }
+
+.blist { display: flex; flex-direction: column; width: min(760px, 100%); border-top: 1px solid var(--line); }
+
+.blist .row {
+  display: grid;
+  grid-template-columns: 56px 1fr auto;
+  gap: 14px;
+  align-items: center;
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--line);
+  font-size: clamp(15px, 1.3vw, 22px);
+  text-align: left;
+}
+
+.blist .row .r { font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--ink-3); font-weight: 700; }
+.blist .row .s { font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--ink-3); font-size: 0.82em; }
+
+[hidden] { display: none !important; }
+
+@media (max-width: 900px) {
+  .board { grid-template-columns: 1fr; grid-template-areas: "head" "main"; }
+  .bside { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .feed-item { animation: none; }
+  .brow .fill { transition: none; }
+}
+</style>
+</head>
+<body>
+
+<div class="board">
+  <header class="bhead">
+    <div class="logo mono">12<span class="colon">:</span>55</div>
+    <div class="meta">
+      <div><span class="k">Round</span><span class="v" id="b-round">—</span></div>
+      <div><span class="k">문항</span><span class="v" id="b-q">— / —</span></div>
+      <div><span class="k">참가</span><span class="v" id="b-joined">0</span></div>
+    </div>
+    <div class="vip-flag" id="b-vip" hidden><span>👑</span><span id="b-vip-text"></span></div>
+  </header>
+
+  <!-- 진행 중 -->
+  <main class="bmain" id="b-play" hidden>
+    <div class="btimer" id="b-timer"><div class="fill" id="b-timer-fill"></div></div>
+    <h1 class="bq" id="b-question"></h1>
+
+    <div class="bcount">
+      <span class="n mono" id="b-alive">0</span>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <span class="k">생존</span>
+        <span class="drop mono" id="b-drop"></span>
+      </div>
+    </div>
+
+    <div class="btally">
+      <div class="brow" id="b-row-o"><span class="g mono">O</span><div class="track"><div class="fill" id="b-fill-o"></div></div><span class="n mono" id="b-num-o">0</span></div>
+      <div class="brow x" id="b-row-x"><span class="g mono">X</span><div class="track"><div class="fill" id="b-fill-x"></div></div><span class="n mono" id="b-num-x">0</span></div>
+    </div>
+  </main>
+
+  <!-- 대기 / 결과 -->
+  <section class="bcenter" id="b-center">
+    <div class="label" id="b-center-label">대기 중</div>
+    <div class="huge mono" id="b-center-big">--:--</div>
+    <div class="sub" id="b-center-sub"></div>
+    <div class="blist" id="b-center-list" hidden></div>
+  </section>
+
+  <aside class="bside">
+    <h2>탈락</h2>
+    <div class="feed" id="b-feed"></div>
+  </aside>
+</div>
+
+<script src="board.js"></script>
+</body>
+</html>

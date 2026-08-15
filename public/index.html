@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0E1020">
+<title>12:55</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body data-screen="login">
+
+<div class="guides" aria-hidden="true"></div>
+
+<div class="demo-strip" id="demo-strip" aria-hidden="true">체험 모드 · 나머지는 봇입니다</div>
+
+<!-- ══════════════════════════════════ 로그인 -->
+<section class="screen" id="s-login">
+  <div class="clock" aria-label="12시 55분">12<span class="colon">:</span>55</div>
+  <p class="tagline">점심시간 마지막 5분.<br>마지막 한 명이 남을 때까지.</p>
+
+  <form class="login-form" id="login-form" autocomplete="off">
+    <div class="field">
+      <label class="label" for="empId">사번</label>
+      <input id="empId" name="empId" inputmode="numeric" pattern="\d{5}" maxlength="5"
+             placeholder="26005" aria-describedby="login-hint" required>
+    </div>
+    <button class="btn btn-primary" type="submit" id="join-btn">입장</button>
+    <button class="btn" type="button" id="demo-open">혼자 체험해보기</button>
+    <p class="error" id="login-error" role="alert"></p>
+    <p class="hint" id="login-hint">사번 5자리를 입력하세요.<br>2년차 미만이면 부활권 1개가 자동 지급됩니다.</p>
+  </form>
+</section>
+
+<!-- ══════════════════════════════════ 체험 모드 -->
+<section class="screen" id="s-demo">
+  <div class="demo-body">
+    <div>
+      <div class="label">체험 모드</div>
+      <h1 class="demo-title">혼자서, 아무 때나.<br>나머지 자리는 봇이 채웁니다.</h1>
+      <p class="hint">봇은 난이도에 맞는 정답률로 답합니다. 집계 바, 생존자 감소, 탈락 피드, 서든데스까지 실제 회차와 같은 모양으로 움직입니다.</p>
+    </div>
+
+    <div class="opt" id="opt-role">
+      <div class="label">내 역할</div>
+      <div class="chips">
+        <button class="chip" type="button" data-role="new" aria-pressed="true">🌱 신입 · 부활권 1개</button>
+        <button class="chip" type="button" data-role="normal" aria-pressed="false">일반 직원</button>
+        <button class="chip" type="button" data-role="vip" aria-pressed="false">👑 원장</button>
+      </div>
+    </div>
+
+    <div class="opt">
+      <div class="label">함께할 인원</div>
+      <div class="chips">
+        <button class="chip" type="button" data-bots="20" aria-pressed="false">20명</button>
+        <button class="chip" type="button" data-bots="80" aria-pressed="true">80명</button>
+        <button class="chip" type="button" data-bots="200" aria-pressed="false">200명</button>
+        <button class="chip" type="button" data-bots="450" aria-pressed="false">450명 · 전사</button>
+      </div>
+    </div>
+
+    <div class="opt">
+      <div class="label">대기실</div>
+      <div class="chips">
+        <button class="chip" type="button" data-lobby="3" aria-pressed="true">3초 · 바로 시작</button>
+        <button class="chip" type="button" data-lobby="15" aria-pressed="false">15초</button>
+        <button class="chip" type="button" data-lobby="60" aria-pressed="false">60초</button>
+      </div>
+    </div>
+
+    <div class="demo-actions">
+      <button class="btn btn-primary" id="demo-start">체험 시작</button>
+      <button class="btn" id="demo-back">뒤로</button>
+    </div>
+    <p class="error" id="demo-error" role="alert"></p>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════ 대기실 -->
+<section class="screen" id="s-lobby">
+  <div class="label" style="text-align:center">시작까지</div>
+
+  <div class="dial">
+    <div class="ring"></div>
+    <div class="ring ring-2"></div>
+    <div class="countdown mono" id="lobby-countdown">00:30</div>
+  </div>
+
+  <div class="stat-row">
+    <div class="stat"><span class="v mono" id="lobby-joined">0</span><span class="k">참가자</span></div>
+    <div class="stat"><span class="v mono" id="lobby-questions">5</span><span class="k">문항</span></div>
+    <div class="stat"><span class="v mono" id="lobby-revives">0</span><span class="k">부활권</span></div>
+  </div>
+
+  <div class="me-card" id="me-card">
+    <strong id="me-name">—</strong>
+    <span class="dept" id="me-dept"></span>
+    <span id="me-badges"></span>
+  </div>
+
+  <p class="hint" style="text-align:center;max-width:32ch">
+    O 또는 X를 7초 안에 고르세요.<br>답을 안 내면 오답으로 처리됩니다.
+  </p>
+
+  <button class="btn" id="lobby-demo" hidden>혼자 체험해보기</button>
+</section>
+
+<!-- ══════════════════════════════════ 문항 진행 -->
+<section class="screen" id="s-question">
+  <header class="topbar">
+    <span class="qnum mono">Q <b id="q-index">01</b> / <span id="q-total">05</span></span>
+    <span class="alive-chip mono"><i class="dot"></i><span id="q-alive">0</span> 생존</span>
+  </header>
+
+  <div class="timer" id="q-timer"><div class="fill" id="q-timer-fill"></div></div>
+
+  <div class="qbody">
+    <span class="diff" id="q-diff" data-d="easy"><i></i><i></i><i></i> <span id="q-diff-text">쉬움</span></span>
+    <h1 class="qtext" id="q-text"></h1>
+  </div>
+
+  <div class="tally">
+    <div class="tally-bar" aria-hidden="true">
+      <span class="t-o" id="bar-o"></span>
+      <span class="t-x" id="bar-x"></span>
+    </div>
+    <div class="tally-nums mono">
+      <span>O <b id="num-o">0</b></span>
+      <span><b id="num-x">0</b> X</span>
+    </div>
+  </div>
+
+  <p class="send-state" id="send-state" role="status" aria-live="polite"></p>
+
+  <div class="choices">
+    <button class="choice" id="btn-o" aria-pressed="false" aria-label="O, 맞다"><span class="glyph">O</span></button>
+    <button class="choice" id="btn-x" aria-pressed="false" aria-label="X, 아니다"><span class="glyph">X</span></button>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════ 정답 공개 -->
+<section class="screen" id="s-reveal">
+  <div class="label">정답</div>
+  <div class="verdict-glyph mono" id="rv-answer">O</div>
+  <p class="verdict-line" id="rv-line"></p>
+
+  <div class="evidence">
+    <p id="rv-evidence"></p>
+    <span class="src mono" id="rv-source"></span>
+  </div>
+
+  <div class="cull mono" id="rv-cull"></div>
+</section>
+
+<!-- ══════════════════════════════════ 부활권 -->
+<section class="screen" id="s-revive">
+  <div class="label">부활권</div>
+  <h2 class="verdict-line">탈락했습니다.<br>부활권을 쓰시겠어요?</h2>
+
+  <div class="revive-ring">
+    <svg viewBox="0 0 132 132" aria-hidden="true">
+      <circle class="track" cx="66" cy="66" r="62"></circle>
+      <circle class="bar" id="revive-bar" cx="66" cy="66" r="62"
+              stroke-dasharray="389.6" stroke-dashoffset="0"></circle>
+    </svg>
+    <span class="n mono" id="revive-count">3</span>
+  </div>
+
+  <div class="revive-actions">
+    <button class="btn btn-primary" id="revive-use">사용</button>
+    <button class="btn" id="revive-skip">아끼기</button>
+  </div>
+  <p class="hint" style="text-align:center">아끼면 그대로 탈락합니다. 남은 문항은 더 어려워집니다.</p>
+</section>
+
+<!-- ══════════════════════════════════ 탈락 / 관전 -->
+<section class="screen" id="s-watch">
+  <header class="topbar">
+    <span class="qnum mono">Q <b id="w-index">01</b> / <span id="w-total">05</span></span>
+    <span class="alive-chip mono"><i class="dot"></i><span id="w-alive">0</span> 생존</span>
+  </header>
+
+  <div class="watch-body">
+    <span class="dead-mark">탈락</span>
+    <div class="big mono" id="w-survived">0</div>
+    <div class="label">문항 생존</div>
+    <p class="hint" id="w-note" style="max-width:30ch">끝까지 지켜보세요. 누가 남는지가 오늘 점심 대화입니다.</p>
+  </div>
+
+  <div class="tally">
+    <div class="tally-bar" aria-hidden="true">
+      <span class="t-o" id="w-bar-o"></span>
+      <span class="t-x" id="w-bar-x"></span>
+    </div>
+    <div class="tally-nums mono">
+      <span>O <b id="w-num-o">0</b></span>
+      <span><b id="w-num-x">0</b> X</span>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════ 서든데스 -->
+<section class="screen" id="s-sudden">
+  <header class="topbar">
+    <span class="qnum mono">SUDDEN <b>DEATH</b></span>
+    <span class="alive-chip mono"><i class="dot"></i><span id="sd-alive">0</span> 생존</span>
+  </header>
+
+  <div class="timer" id="sd-timer"><div class="fill" id="sd-timer-fill"></div></div>
+
+  <div class="qbody">
+    <span class="label">가장 가까운 숫자가 이깁니다</span>
+    <h1 class="qtext" id="sd-text"></h1>
+  </div>
+
+  <form id="sudden-form" style="display:flex;flex-direction:column;gap:12px">
+    <input class="sudden-input mono" id="sd-value" inputmode="numeric" placeholder="0" aria-label="답">
+    <button class="btn btn-primary" type="submit" id="sd-submit">제출</button>
+    <p class="hint" id="sd-note" style="text-align:center">동점이면 더 빨리 낸 사람이 이깁니다.</p>
+  </form>
+</section>
+
+<!-- ══════════════════════════════════ 결과 -->
+<section class="screen" id="s-result">
+  <div class="champ">
+    <span class="crown" id="rs-crown">👑</span>
+    <div class="label" id="rs-label">이주의 챔피언</div>
+    <div class="name" id="rs-name">—</div>
+    <div class="dept" id="rs-dept"></div>
+  </div>
+
+  <div id="rs-sudden-answer" class="evidence" hidden>
+    <p id="rs-sudden-text"></p>
+    <span class="src mono" id="rs-sudden-src"></span>
+  </div>
+
+  <div id="rs-vip" class="evidence" hidden>
+    <p id="rs-vip-text"></p>
+  </div>
+
+  <div class="label">순위</div>
+  <div class="rank-list" id="rs-ranking"></div>
+
+  <div class="demo-actions" style="margin-top:16px">
+    <button class="btn btn-primary" id="rs-replay" hidden>한 판 더</button>
+    <button class="btn" id="rs-again">대기실로</button>
+  </div>
+</section>
+
+<script src="app.js"></script>
+</body>
+</html>

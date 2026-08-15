@@ -1,0 +1,53 @@
+{
+  "_note": "MVP 데모용 직원 명부. 실제 운영 시 사내 SSO 또는 인사 데이터 연동으로 대체한다. 이름과 부서는 모두 가상이다.",
+
+  "_idFormat": [
+    "사번은 5자리다. 명부에 등록된 사번은 joinYear 값을 그대로 쓴다.",
+    "명부에 없는 사번은 idFormat 규칙으로 입사연도를 추정해 자동 등록한다.",
+    "yearPrefix: 2 → 앞 2자리를 두 자리 입사연도로 해석한다 (26005 → 2026년 입사).",
+    "yearPrefix: 0 → 연도를 추정하지 않고 defaultYears 연차로 처리한다 (부활권 없음).",
+    "사내 사번 체계가 순번제라면 yearPrefix를 0으로 두고 roster를 인사 데이터로 채우면 된다."
+  ],
+
+  "idFormat": {
+    "digits": 5,
+    "yearPrefix": 2,
+    "defaultYears": 5
+  },
+
+  "departments": [
+    "지능정보기술실",
+    "데이터실",
+    "특허정보사업실",
+    "정보서비스실",
+    "고객지원실",
+    "심사지원실",
+    "경영지원실"
+  ],
+
+  "roster": [
+    { "empId": "95001", "name": "김원장", "dept": "원장실", "joinYear": 1995, "vip": true, "title": "원장" },
+    { "empId": "03014", "name": "박운영", "dept": "경영지원실", "joinYear": 2003, "vip": true, "title": "운영실장" },
+
+    { "empId": "05021", "name": "이정보", "dept": "특허정보사업실", "joinYear": 2005 },
+    { "empId": "08033", "name": "최데이터", "dept": "데이터실", "joinYear": 2008 },
+    { "empId": "10007", "name": "정지능", "dept": "지능정보기술실", "joinYear": 2010 },
+    { "empId": "11045", "name": "강서비스", "dept": "정보서비스실", "joinYear": 2011 },
+    { "empId": "13018", "name": "윤심사", "dept": "심사지원실", "joinYear": 2013 },
+    { "empId": "14062", "name": "장고객", "dept": "고객지원실", "joinYear": 2014 },
+    { "empId": "15029", "name": "임특허", "dept": "특허정보사업실", "joinYear": 2015 },
+    { "empId": "16011", "name": "한분석", "dept": "데이터실", "joinYear": 2016 },
+    { "empId": "17054", "name": "오모델", "dept": "지능정보기술실", "joinYear": 2017 },
+    { "empId": "18003", "name": "신검색", "dept": "정보서비스실", "joinYear": 2018 },
+    { "empId": "19037", "name": "권상담", "dept": "고객지원실", "joinYear": 2019 },
+    { "empId": "20025", "name": "황출원", "dept": "심사지원실", "joinYear": 2020 },
+    { "empId": "21049", "name": "안기획", "dept": "경영지원실", "joinYear": 2021 },
+    { "empId": "22016", "name": "송개발", "dept": "지능정보기술실", "joinYear": 2022 },
+    { "empId": "23008", "name": "배수집", "dept": "데이터실", "joinYear": 2023 },
+
+    { "empId": "25012", "name": "문신입", "dept": "지능정보기술실", "joinYear": 2025 },
+    { "empId": "25034", "name": "유주니어", "dept": "데이터실", "joinYear": 2025 },
+    { "empId": "26005", "name": "조새싹", "dept": "정보서비스실", "joinYear": 2026 },
+    { "empId": "26019", "name": "차루키", "dept": "특허정보사업실", "joinYear": 2026 }
+  ]
+}

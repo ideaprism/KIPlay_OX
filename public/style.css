@@ -1,0 +1,863 @@
+/* ═══════════════════════════════════════════════════════════════
+   12:55 — 디자인 시스템
+
+   CONSTRAINTS CARD
+     FONT   시스템 산세리프(제목·본문) + ui-monospace(모든 숫자·라벨)
+     STYLE  다크 아레나. 인디고 블랙 바탕에 시그널 앰버 단일 강조색.
+            세계관은 카운트다운 시계 · 스타디움 전광판 · 출발안내판.
+     MODE   다크 전용. 의도적 단일 테마이므로 모든 색을 명시적으로 칠한다.
+
+   존 규칙 (상충하는 원칙의 해소)
+     참여자 화면 — 극적이어도 된다. 스큐어모픽 O/X 버튼, 글로우, 플래시 허용.
+     전광판 화면 — 가독성이 분위기를 이긴다. 하드 그리드, 낮은 라운딩,
+                   그림자 최소, 글로우 금지. 3m 거리 판독이 절대 기준.
+   ═══════════════════════════════════════════════════════════════ */
+
+:root {
+  /* ── 지면과 표면 */
+  --ground: #0E1020;
+  --surface: #171A2D;
+  --surface-2: #1F2338;
+  --surface-3: #262B44;
+
+  /* ── 글자 */
+  --ink: #EEEEF6;
+  --ink-2: #AFB4CE;
+  --ink-3: #838AAA;
+
+  /* ── 선 */
+  --line: #2A2F49;
+  --line-2: #3A4062;
+
+  /* ── 단일 강조색. 무지개 금지. */
+  --amber: #FFB43C;
+  --amber-deep: #C25E06;
+  --amber-soft: rgba(255, 180, 60, 0.14);
+
+  /* ── 의미색. 강조색과 별개 축이다. */
+  --live: #4FC08D;
+  --live-soft: rgba(79, 192, 141, 0.14);
+  --out: #F0736A;
+  --out-soft: rgba(240, 115, 106, 0.14);
+
+  /* ── 이징. 진입은 ease-out, 이탈은 ease-in으로 더 짧게. */
+  --ease-out-soft: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  --ease-out: cubic-bezier(0.215, 0.61, 0.355, 1);
+  --ease-out-hard: cubic-bezier(0.165, 0.84, 0.44, 1);
+  --ease-expo: cubic-bezier(0.19, 1, 0.22, 1);
+  --ease-editorial: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+
+  /* ── 듀레이션 */
+  --t-press: 120ms;
+  --t-control: 180ms;
+  --t-pop: 260ms;
+  --t-enter: 600ms;
+  --t-reveal: 800ms;
+  --t-hero: 1200ms;
+  --t-glow-in: 600ms;
+  --t-glow-out: 500ms;
+
+  /* ── 간격 */
+  --sp-1: 8px;
+  --sp-2: 16px;
+  --sp-3: 24px;
+
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+  --sans: "Pretendard Variable", Pretendard, "Apple SD Gothic Neo", "Malgun Gothic", system-ui, -apple-system, sans-serif;
+}
+
+/* ─────────────────────────────────────────────── 기본 */
+
+* { box-sizing: border-box; }
+
+html, body { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  word-break: keep-all;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+input { font: inherit; color: inherit; }
+
+:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 3px;
+}
+
+.mono {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.label {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  font-weight: 600;
+}
+
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+/* ─────────────────────────────────────────────── 구조 격자 */
+
+.guides {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    linear-gradient(var(--line) 1px, transparent 1px) 0 0 / 100% 25%,
+    linear-gradient(90deg, var(--line) 1px, transparent 1px) 0 0 / 25% 100%;
+  opacity: 0.35;
+  mask-image: radial-gradient(ellipse at center, #000 20%, transparent 78%);
+  -webkit-mask-image: radial-gradient(ellipse at center, #000 20%, transparent 78%);
+}
+
+/* ─────────────────────────────────────────────── 화면 전환 */
+
+.screen {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  display: none;
+  flex-direction: column;
+  padding: max(20px, env(safe-area-inset-top)) 20px max(20px, env(safe-area-inset-bottom));
+}
+
+body[data-screen="login"]  #s-login,
+body[data-screen="demo"]   #s-demo,
+body[data-screen="lobby"]  #s-lobby,
+body[data-screen="question"] #s-question,
+body[data-screen="reveal"] #s-reveal,
+body[data-screen="revive"] #s-revive,
+body[data-screen="watch"]  #s-watch,
+body[data-screen="sudden"] #s-sudden,
+body[data-screen="result"] #s-result { display: flex; }
+
+.screen > * { position: relative; }
+
+/* ─────────────────────────────────────────────── 체험 모드
+   실전 회차와 헷갈리면 안 되므로 진행 내내 상단 띠로 알린다.
+   띠가 내용을 가리지 않도록 체험 중에만 화면 패딩을 밀어준다. */
+
+.demo-strip {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 4;
+  display: none;
+  padding: calc(env(safe-area-inset-top) + 5px) 12px 5px;
+  text-align: center;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: #241503;
+  background: var(--amber);
+}
+
+body[data-demo="1"] .demo-strip { display: block; }
+
+body[data-demo="1"] .screen {
+  padding-top: calc(max(20px, env(safe-area-inset-top)) + 26px);
+}
+
+#s-demo { justify-content: center; overflow-y: auto; }
+
+.demo-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  width: min(420px, 100%);
+  margin: auto;
+  padding: 20px 0;
+}
+
+.demo-title {
+  font-size: clamp(23px, 6vw, 30px);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.4;
+  margin: 6px 0 10px;
+  text-wrap: balance;
+}
+
+.opt { display: flex; flex-direction: column; gap: 10px; }
+
+.chips { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.chip {
+  padding: 11px 16px;
+  border-radius: 100px;
+  background: var(--surface);
+  border: 1px solid var(--line-2);
+  font-size: 14px;
+  letter-spacing: -0.01em;
+  transition: border-color var(--t-control) var(--ease-out),
+              color var(--t-control) var(--ease-out),
+              background var(--t-control) var(--ease-out);
+}
+
+.chip[aria-pressed="true"] {
+  border-color: var(--amber);
+  color: var(--amber);
+  background: var(--amber-soft);
+  font-weight: 700;
+}
+
+.demo-actions { display: grid; grid-template-columns: 1fr auto; gap: 10px; }
+
+/* ─────────────────────────────────────────────── 시계 */
+
+.clock {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  letter-spacing: -0.045em;
+  line-height: 0.9;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.02em;
+}
+
+.clock .colon {
+  color: var(--amber);
+  animation: blink 2s steps(1, end) infinite;
+}
+
+@keyframes blink { 0%, 55% { opacity: 1; } 56%, 100% { opacity: 0.2; } }
+
+/* ─────────────────────────────────────────────── 로그인 */
+
+#s-login {
+  justify-content: center;
+  align-items: center;
+  gap: var(--sp-3);
+  text-align: center;
+}
+
+#s-login .clock { font-size: clamp(72px, 24vw, 128px); }
+
+#s-login .tagline {
+  color: var(--ink-2);
+  max-width: 30ch;
+  margin: 0;
+  font-size: 15px;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(340px, 100%);
+  margin-top: var(--sp-2);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+}
+
+.field input {
+  width: 100%;
+  padding: 16px 18px;
+  border-radius: 10px;
+  background: var(--surface);
+  border: 1px solid transparent;
+  background:
+    linear-gradient(var(--surface), var(--surface)) padding-box,
+    linear-gradient(135deg, rgba(255, 255, 255, 0.22), rgba(255, 180, 60, 0.3), rgba(255, 255, 255, 0.06)) border-box;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 22px;
+  letter-spacing: 0.08em;
+  text-align: center;
+  transition: box-shadow var(--t-control) var(--ease-out);
+}
+
+.field input::placeholder { color: var(--ink-3); letter-spacing: 0.04em; }
+.field input:focus { outline: none; box-shadow: 0 0 0 3px var(--amber-soft); }
+
+.hint { font-size: 12.5px; color: var(--ink-3); margin: 0; line-height: 1.55; }
+.error { font-size: 13px; color: var(--out); margin: 0; min-height: 1.2em; }
+
+/* ─────────────────────────────────────────────── 버튼 */
+
+.btn {
+  padding: 15px 22px;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: -0.01em;
+  background: linear-gradient(180deg, #22263D, #171A2D 48%, #0F1223);
+  box-shadow:
+    0 10px 22px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.09),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.5);
+  transition: transform var(--t-press) var(--ease-out-soft),
+              box-shadow var(--t-control) var(--ease-out);
+}
+
+.btn:active { transform: translateY(1px); box-shadow: inset 0 4px 10px rgba(0, 0, 0, 0.5); }
+
+.btn-primary {
+  background: linear-gradient(180deg, #FFC661, var(--amber) 46%, #E08A12);
+  color: #241503;
+  box-shadow:
+    0 10px 26px rgba(255, 180, 60, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 -1px 0 rgba(120, 60, 0, 0.4);
+}
+
+.btn:disabled { opacity: 0.4; cursor: default; }
+
+/* ─────────────────────────────────────────────── 대기실 */
+
+#s-lobby { justify-content: center; align-items: center; gap: var(--sp-2); text-align: center; }
+
+.countdown {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(60px, 20vw, 104px);
+  font-weight: 700;
+  letter-spacing: -0.05em;
+  line-height: 1;
+  color: var(--amber);
+}
+
+.dial {
+  position: relative;
+  width: min(260px, 70vw);
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  margin: 4px 0;
+}
+
+.dial .ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1px solid var(--line-2);
+}
+
+.dial .ring::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: 50%;
+  border: 1px solid transparent;
+  border-top-color: var(--amber);
+  animation: spin 8s linear infinite;
+}
+
+.dial .ring-2 { inset: 16px; opacity: 0.5; }
+.dial .ring-2::after { animation-duration: 13s; animation-direction: reverse; border-top-color: var(--line-2); }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.stat-row {
+  display: flex;
+  gap: 1px;
+  background: var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  width: min(400px, 100%);
+}
+
+.stat {
+  flex: 1;
+  background: var(--surface);
+  padding: 14px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: center;
+}
+
+.stat .v {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.stat .k { font-size: 11px; color: var(--ink-3); letter-spacing: 0.04em; }
+
+.me-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 18px;
+  border-radius: 100px;
+  background: var(--surface);
+  border: 1px solid transparent;
+  background:
+    linear-gradient(var(--surface), var(--surface)) padding-box,
+    linear-gradient(135deg, rgba(255, 255, 255, 0.2), rgba(255, 180, 60, 0.28), rgba(255, 255, 255, 0.05)) border-box;
+  font-size: 14.5px;
+}
+
+.me-card .dept { color: var(--ink-3); font-size: 13px; }
+
+.badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 100px;
+  letter-spacing: 0.02em;
+}
+
+.badge-new { background: var(--live-soft); color: var(--live); border: 1px solid currentColor; }
+.badge-vip { background: var(--amber-soft); color: var(--amber); border: 1px solid currentColor; }
+
+/* ─────────────────────────────────────────────── 문항 진행 */
+
+#s-question, #s-watch, #s-sudden { justify-content: space-between; gap: var(--sp-2); }
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex: 0 0 auto;
+}
+
+.qnum {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--ink-3);
+}
+
+.qnum b { color: var(--amber); }
+
+.alive-chip {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 5px 12px;
+  border-radius: 100px;
+  background: var(--surface);
+  border: 1px solid var(--line-2);
+}
+
+.alive-chip .dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--live);
+  box-shadow: 0 0 0 3px var(--live-soft);
+}
+
+/* 타이머 — 남은 시간 자체가 정보이므로 폭 애니메이션이 아니라 transform으로 그린다 */
+.timer {
+  position: relative;
+  height: 6px;
+  border-radius: 100px;
+  background: var(--surface-2);
+  overflow: hidden;
+  flex: 0 0 auto;
+}
+
+.timer .fill {
+  position: absolute;
+  inset: 0;
+  transform-origin: left center;
+  background: linear-gradient(90deg, var(--amber-deep), var(--amber));
+  will-change: transform;
+}
+
+.timer.urgent .fill { background: linear-gradient(90deg, #B3352C, var(--out)); }
+
+.qbody {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--sp-2);
+  min-height: 0;
+}
+
+.qtext {
+  font-size: clamp(21px, 5.6vw, 32px);
+  font-weight: 700;
+  line-height: 1.45;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+  margin: 0;
+}
+
+/* 마스크 워드 리빌 — 아래에서 솟아오른다 */
+.wmask { display: inline-block; overflow: hidden; vertical-align: top; }
+
+.word {
+  display: inline-block;
+  transform: translateY(110%);
+  transition: transform var(--t-reveal) var(--ease-expo);
+  transition-delay: calc(var(--i) * 35ms);
+  will-change: transform;
+}
+
+.is-revealed .word { transform: translateY(0); }
+
+.diff {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.diff i { width: 5px; height: 5px; border-radius: 1px; background: var(--line-2); font-style: normal; }
+.diff[data-d="easy"] i:nth-child(-n+1),
+.diff[data-d="medium"] i:nth-child(-n+2),
+.diff[data-d="hard"] i:nth-child(-n+3) { background: var(--amber); }
+
+/* ─────────────────────────────────────────────── 집계 바 */
+
+.tally { display: flex; flex-direction: column; gap: 6px; flex: 0 0 auto; }
+
+.tally-bar {
+  display: flex;
+  height: 8px;
+  border-radius: 100px;
+  overflow: hidden;
+  background: var(--surface-2);
+}
+
+.tally-bar span {
+  display: block;
+  transition: flex-grow var(--t-pop) var(--ease-out-soft);
+  flex-grow: 1;
+  flex-basis: 0;
+}
+
+.tally-bar .t-o { background: var(--ink-2); }
+.tally-bar .t-x { background: var(--surface-3); }
+
+.tally-nums {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+
+/* ── 전송 상태
+   버튼이 눌린 것과 서버가 받은 것은 다르다. 답안 유실은 곧 억울한 탈락이므로
+   도달 여부를 반드시 눈에 보이게 알린다. 시각 효과만으로 상태를 대신하지 않는다. */
+.send-state {
+  margin: 0;
+  min-height: 1.4em;
+  text-align: center;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  letter-spacing: 0.04em;
+  color: var(--ink-3);
+  transition: color var(--t-control) var(--ease-out);
+  flex: 0 0 auto;
+}
+
+.send-state[data-s="ok"] { color: var(--live); }
+.send-state[data-s="pending"] { color: var(--amber); }
+.send-state[data-s="fail"] { color: var(--out); font-weight: 700; }
+
+/* ─────────────────────────────────────────────── O / X 버튼 */
+
+.choices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  flex: 0 0 auto;
+  height: min(40vh, 260px);
+}
+
+.choice {
+  position: relative;
+  border-radius: 22px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, #1B1E33, #141728 48%, #0B0D1A) padding-box,
+    linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.05) 45%, rgba(0, 0, 0, 0.6)) border-box;
+  border: 1px solid transparent;
+  box-shadow:
+    0 18px 34px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.6);
+  transition: transform var(--t-press) var(--ease-out-soft),
+              box-shadow var(--t-control) var(--ease-out),
+              border-color var(--t-control) var(--ease-out);
+}
+
+/* 상단 스페큘러 캡 — 빛은 위에서 온다 */
+.choice::after {
+  content: "";
+  position: absolute;
+  inset: 1px 1px auto;
+  height: 34%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.09), transparent);
+  pointer-events: none;
+}
+
+.choice .glyph {
+  font-family: var(--mono);
+  font-size: clamp(56px, 17vw, 92px);
+  font-weight: 700;
+  line-height: 1;
+  color: var(--ink);
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.6);
+  transition: color var(--t-control) var(--ease-out);
+}
+
+.choice:active { transform: translateY(1px); box-shadow: inset 0 5px 12px rgba(0, 0, 0, 0.6); }
+
+/* 선택 상태 — 베리언트는 앰버 테두리 + 절제된 내부 글로우 */
+.choice[aria-pressed="true"] {
+  background:
+    linear-gradient(180deg, #2A2035, #1E1828 48%, #120E1C) padding-box,
+    linear-gradient(180deg, rgba(255, 180, 60, 0.85), rgba(255, 180, 60, 0.35) 50%, rgba(0, 0, 0, 0.5)) border-box;
+  box-shadow:
+    0 18px 34px rgba(0, 0, 0, 0.5),
+    inset 0 0 26px rgba(255, 180, 60, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+.choice[aria-pressed="true"] .glyph { color: var(--amber); }
+
+/* 선택 순간의 버스트는 한 번만, 그 뒤엔 정적 선택 스타일로 남는다 */
+.choice.burst { animation: burst 900ms var(--ease-out-hard); }
+
+@keyframes burst {
+  0% { box-shadow: 0 18px 34px rgba(0,0,0,.5), inset 0 0 0 rgba(255,180,60,0), 0 0 0 0 rgba(255,180,60,.5); }
+  30% { box-shadow: 0 18px 34px rgba(0,0,0,.5), inset 0 0 34px rgba(255,180,60,.34), 0 0 0 10px rgba(255,180,60,0); }
+  100% { box-shadow: 0 18px 34px rgba(0,0,0,.5), inset 0 0 26px rgba(255,180,60,.22), 0 0 0 0 rgba(255,180,60,0); }
+}
+
+.choice.correct {
+  background: linear-gradient(180deg, #163A2C, #0F2A20 48%, #08160F) padding-box,
+              linear-gradient(180deg, rgba(79, 192, 141, 0.9), rgba(79, 192, 141, 0.3)) border-box;
+}
+
+.choice.correct .glyph { color: var(--live); }
+.choice.wrong { opacity: 0.32; }
+.choice.wrong .glyph { color: var(--ink-3); }
+
+/* ─────────────────────────────────────────────── 정답 공개 */
+
+#s-reveal { justify-content: center; align-items: center; gap: var(--sp-2); text-align: center; }
+
+.verdict-glyph {
+  font-family: var(--mono);
+  font-size: clamp(88px, 30vw, 160px);
+  font-weight: 700;
+  line-height: 1;
+  animation: pop var(--t-reveal) var(--ease-out-hard);
+}
+
+@keyframes pop {
+  0% { opacity: 0; transform: scale(0.9); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+.verdict-line {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+.verdict-ok { color: var(--live); }
+.verdict-no { color: var(--out); }
+
+.evidence {
+  background: var(--surface);
+  border-left: 3px solid var(--amber);
+  border-radius: 0 8px 8px 0;
+  padding: 14px 16px;
+  text-align: left;
+  max-width: 460px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.evidence p { margin: 0; font-size: 14px; color: var(--ink-2); line-height: 1.6; }
+.evidence .src { font-family: var(--mono); font-size: 11.5px; color: var(--ink-3); letter-spacing: 0.02em; }
+
+.cull {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 15px;
+  color: var(--out);
+  font-weight: 700;
+}
+
+/* ─────────────────────────────────────────────── 부활권 */
+
+#s-revive { justify-content: center; align-items: center; gap: var(--sp-3); text-align: center; }
+
+.revive-ring {
+  position: relative;
+  width: 132px;
+  height: 132px;
+  display: grid;
+  place-items: center;
+}
+
+.revive-ring svg { position: absolute; inset: 0; transform: rotate(-90deg); }
+.revive-ring circle { fill: none; stroke-width: 5; }
+.revive-ring .track { stroke: var(--surface-2); }
+.revive-ring .bar { stroke: var(--amber); stroke-linecap: round; transition: stroke-dashoffset 100ms linear; }
+
+.revive-ring .n {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 52px;
+  font-weight: 700;
+  color: var(--amber);
+}
+
+.revive-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; width: min(360px, 100%); }
+
+/* ─────────────────────────────────────────────── 탈락 / 관전 */
+
+#s-watch .dead-mark {
+  align-self: center;
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  color: var(--out);
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  padding: 4px 12px;
+}
+
+.watch-body {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: var(--sp-2);
+  text-align: center;
+  min-height: 0;
+}
+
+.watch-body .big {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(56px, 18vw, 88px);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+/* ─────────────────────────────────────────────── 서든데스 */
+
+.sudden-input {
+  width: 100%;
+  padding: 18px;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1px solid var(--line-2);
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 34px;
+  font-weight: 700;
+  text-align: center;
+  letter-spacing: 0.04em;
+}
+
+.sudden-input:focus { outline: none; border-color: var(--amber); box-shadow: 0 0 0 3px var(--amber-soft); }
+
+/* ─────────────────────────────────────────────── 결과 */
+
+#s-result { gap: var(--sp-2); overflow-y: auto; }
+
+.champ {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: var(--sp-3) var(--sp-2);
+  text-align: center;
+}
+
+.champ .crown { font-size: 34px; line-height: 1; }
+
+.champ .name {
+  font-size: clamp(30px, 9vw, 46px);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  animation: pop var(--t-hero) var(--ease-out-hard);
+}
+
+.champ .dept { color: var(--ink-3); font-size: 14px; }
+
+.rank-list { display: flex; flex-direction: column; border-top: 1px solid var(--line); }
+
+.rank-row {
+  display: grid;
+  grid-template-columns: 34px 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 11px 4px;
+  border-bottom: 1px solid var(--line);
+  font-size: 14.5px;
+}
+
+.rank-row .r {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink-3);
+}
+
+.rank-row.me { background: var(--amber-soft); margin: 0 -8px; padding-inline: 12px; border-radius: 6px; }
+.rank-row .s { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 13px; color: var(--ink-3); }
+
+/* ─────────────────────────────────────────────── 리듀스드 모션 */
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .word { transform: none !important; }
+  .clock .colon { animation: none; }
+  .dial .ring::after { animation: none; }
+}

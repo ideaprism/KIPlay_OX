@@ -1,0 +1,18 @@
+{
+  "name": "kiplay-ox",
+  "version": "0.1.0",
+  "private": true,
+  "description": "12:55 — 매주 월요일 점심시간 마지막 5분에 열리는 전사 실시간 OX 서바이벌. KIPI Playground 주간 정규전.",
+  "main": "server.js",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "test": "node scripts/e2e.js",
+    "load": "node scripts/load.js 450",
+    "curve": "node scripts/curve.js 300 3"
+  },
+  "dependencies": {},
+  "license": "MIT"
+}

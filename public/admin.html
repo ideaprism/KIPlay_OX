@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>12:55 — 운영자</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  body { overflow: auto; }
+  .guides { display: none; }
+  .wrap { max-width: 620px; margin: 0 auto; padding: 40px 20px 80px; display: flex; flex-direction: column; gap: 28px; }
+  h1 { font-size: 24px; margin: 0; letter-spacing: -0.02em; }
+  .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 20px; display: flex; flex-direction: column; gap: 14px; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .row > * { flex: 1 1 130px; }
+  input { padding: 12px 14px; border-radius: 8px; background: var(--surface-2); border: 1px solid var(--line-2); width: 100%; }
+  input:focus { outline: none; border-color: var(--amber); }
+  .status { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 1px; background: var(--line); border-radius: 8px; overflow: hidden; }
+  .status div { background: var(--surface-2); padding: 14px 12px; display: flex; flex-direction: column; gap: 3px; }
+  .status .k { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-3); font-family: var(--mono); }
+  .status .v { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
+  .log { font-family: var(--mono); font-size: 12.5px; color: var(--ink-2); background: var(--surface-2); border-radius: 8px; padding: 14px; max-height: 220px; overflow-y: auto; white-space: pre-wrap; line-height: 1.7; }
+  a { color: var(--amber); }
+  .links { display: flex; gap: 16px; flex-wrap: wrap; font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>12:55 운영자 콘솔</h1>
+
+  <div class="status">
+    <div><span class="k">Phase</span><span class="v" id="st-phase">—</span></div>
+    <div><span class="k">Round</span><span class="v" id="st-round">—</span></div>
+    <div><span class="k">참가</span><span class="v" id="st-joined">0</span></div>
+    <div><span class="k">생존</span><span class="v" id="st-alive">0</span></div>
+    <div><span class="k">문항</span><span class="v" id="st-q">—</span></div>
+  </div>
+
+  <div class="panel">
+    <label class="label" for="key">운영 키</label>
+    <input id="key" value="kipi" autocomplete="off">
+
+    <label class="label" for="lobby">대기실 길이 (초)</label>
+    <input id="lobby" type="number" min="5" max="600" value="30">
+
+    <div class="row">
+      <button class="btn btn-primary" id="b-start">게임 시작</button>
+      <button class="btn" id="b-next">다음 단계로</button>
+    </div>
+    <div class="row">
+      <button class="btn" id="b-reset">리셋</button>
+      <button class="btn" id="b-reload">문제 다시 읽기</button>
+    </div>
+    <p class="hint">「다음 단계로」는 현재 단계를 즉시 끝냅니다. 시연 중 무엇이 막히면 이 버튼으로 넘기세요.</p>
+  </div>
+
+  <div class="links">
+    <a href="/" target="_blank">참여자 화면</a>
+    <a href="/board.html" target="_blank">전광판</a>
+    <a href="/?screen=reveal" target="_blank">픽스처: 정답공개</a>
+    <a href="/?screen=revive" target="_blank">픽스처: 부활권</a>
+    <a href="/?screen=champion" target="_blank">픽스처: 챔피언</a>
+  </div>
+
+  <div class="log" id="log">연결 중…</div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const log = (m) => {
+  const t = new Date().toTimeString().slice(0, 8);
+  $('log').textContent = `[${t}] ${m}\n` + $('log').textContent;
+};
+
+async function call(action) {
+  const res = await fetch(`/api/admin/${action}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ key: $('key').value, lobbySec: Number($('lobby').value) }),
+  });
+  const data = await res.json().catch(() => ({}));
+  log(res.ok ? `${action} 실행됨` : `${action} 실패 — ${data.error || res.status}`);
+}
+
+$('b-start').onclick = () => call('start');
+$('b-next').onclick = () => call('next');
+$('b-reset').onclick = () => call('reset');
+$('b-reload').onclick = () => call('reload');
+
+const PHASE_KO = {
+  idle: '대기', lobby: '대기실', question: '문항', reveal: '정답공개',
+  revive: '부활권', sudden: '서든데스', result: '결과',
+};
+
+let lastPhase = null;
+
+function connect() {
+  const es = new EventSource('/api/spectate');
+  es.addEventListener('state', (e) => {
+    const s = JSON.parse(e.data);
+    $('st-phase').textContent = PHASE_KO[s.phase] || s.phase;
+    $('st-round').textContent = s.round || '—';
+    $('st-joined').textContent = s.joined;
+    $('st-alive').textContent = s.alive;
+    $('st-q').textContent = s.qIndex >= 0 ? `${s.qIndex + 1}/${s.qTotal}` : '—';
+    if (s.phase !== lastPhase) { lastPhase = s.phase; log(`→ ${PHASE_KO[s.phase] || s.phase}`); }
+  });
+  es.addEventListener('tally', (e) => {
+    const t = JSON.parse(e.data);
+    $('st-alive').textContent = t.alive;
+    $('st-joined').textContent = t.joined;
+  });
+  es.onerror = () => { es.close(); log('연결 끊김, 재접속…'); setTimeout(connect, 1500); };
+}
+
+connect();
+log('운영자 콘솔 준비됨');
+</script>
+</body>
+</html>
