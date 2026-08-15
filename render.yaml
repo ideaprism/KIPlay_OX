@@ -1,0 +1,29 @@
+# 12:55 배포 설정 (Render / Railway 등 상시 프로세스 호스팅)
+#
+# 이 게임은 인메모리 상태를 가진 단일 상시 프로세스를 전제로 설계했다(PRD 7.1).
+# 그래서 서버리스가 아니라 프로세스가 계속 떠 있는 호스팅이 필요하다.
+#
+# Render 사용법
+#   1. https://render.com 에서 New → Blueprint
+#   2. GitHub 저장소 ideaprism/KIPlay_OX 선택
+#   3. 이 파일이 자동으로 읽힌다. ADMIN_KEY만 바꾸고 배포
+#
+# 무료 플랜은 15분 무활동 시 잠들고 다음 요청에서 깨어나는 데 30초쯤 걸린다.
+# 실제 회차 전에는 미리 한 번 열어 깨워두거나 유료 플랜을 쓴다.
+
+services:
+  - type: web
+    name: kiplay-ox
+    runtime: node
+    plan: free
+    region: singapore
+    buildCommand: ''      # 의존성이 없다
+    startCommand: node server.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: '20'
+      - key: ADMIN_KEY
+        sync: false       # 대시보드에서 직접 설정한다. 기본값 kipi를 그대로 쓰지 말 것
+      - key: PORT
+        value: '10000'
