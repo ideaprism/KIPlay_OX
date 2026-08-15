@@ -717,10 +717,12 @@ function serveStatic(req, res, pathname) {
   });
 }
 
-const server = http.createServer(async (req, res) => {
-  const url = new URL(req.url, `http://${req.headers.host}`);
+async function handler(req, res) {
+  const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   const p = url.pathname;
 
+  // 로컬에서는 이 서버가 정적 파일까지 서빙한다.
+  // 서버리스 배포에서는 플랫폼이 public/을 직접 서빙하므로 /api/*만 여기로 온다.
   if (!p.startsWith('/api/')) return serveStatic(req, res, p);
 
   // ---- 참여자 SSE
@@ -888,7 +890,9 @@ const server = http.createServer(async (req, res) => {
   }
 
   return sendJson(res, 404, { error: 'not found' });
-});
+}
+
+const server = http.createServer(handler);
 
 // ---------------------------------------------------------------- 부팅
 
@@ -897,15 +901,20 @@ function log(msg) {
   console.log(`[${t}] ${msg}`);
 }
 
-server.listen(CONFIG.port, () => {
-  const bar = '─'.repeat(46);
-  console.log(`\n${bar}`);
-  console.log('  12:55  —  전사 실시간 OX 서바이벌');
-  console.log(bar);
-  console.log(`  참여자   http://localhost:${CONFIG.port}/`);
-  console.log(`  전광판   http://localhost:${CONFIG.port}/board.html`);
-  console.log(`  운영자   http://localhost:${CONFIG.port}/admin.html   (키: ${CONFIG.adminKey})`);
-  console.log(`${bar}`);
-  console.log(`  문제 ${BANK.pool.length}개 · 서든데스 ${BANK.sudden.length}개 · 명부 ${ROSTER.size}명`);
-  console.log(`${bar}\n`);
-});
+// 직접 실행할 때만 포트를 연다. 서버리스에서는 handler만 가져다 쓴다.
+if (require.main === module) {
+  server.listen(CONFIG.port, () => {
+    const bar = '─'.repeat(46);
+    console.log(`\n${bar}`);
+    console.log('  12:55  —  전사 실시간 OX 서바이벌');
+    console.log(bar);
+    console.log(`  참여자   http://localhost:${CONFIG.port}/`);
+    console.log(`  전광판   http://localhost:${CONFIG.port}/board.html`);
+    console.log(`  운영자   http://localhost:${CONFIG.port}/admin.html   (키: ${CONFIG.adminKey})`);
+    console.log(`${bar}`);
+    console.log(`  문제 ${BANK.pool.length}개 · 서든데스 ${BANK.sudden.length}개 · 명부 ${ROSTER.size}명`);
+    console.log(`${bar}\n`);
+  });
+}
+
+module.exports = handler;
