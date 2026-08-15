@@ -276,14 +276,22 @@ const vipPlayer = () => [...game.players.values()].find((p) => p.vip) || null;
 
 // ---------------------------------------------------------------- SSE
 
+// 중간 프록시(Cloudflare, nginx, 사내 프록시)는 응답이 일정 크기에 닿을 때까지
+// 버퍼에 모아두는 경우가 있다. 그러면 SSE 이벤트가 한참 뒤에야 도착하거나 아예 오지 않아
+// 화면이 통째로 멈춘다. 스트림을 열 때 패딩 주석을 한 번 보내 버퍼를 강제로 흘려보낸다.
+const SSE_PADDING = `:${' '.repeat(4096)}\n\n`;
+
 function sseOpen(res) {
   res.writeHead(200, {
     'Content-Type': 'text/event-stream; charset=utf-8',
     'Cache-Control': 'no-cache, no-transform',
+    'Content-Encoding': 'identity',
     Connection: 'keep-alive',
     'X-Accel-Buffering': 'no',
   });
+  res.write(SSE_PADDING);
   res.write('retry: 3000\n\n');
+  if (typeof res.flushHeaders === 'function') res.flushHeaders();
 }
 
 function sseSend(res, event, data) {
@@ -913,7 +921,16 @@ if (require.main === module) {
     console.log(`  운영자   http://localhost:${CONFIG.port}/admin.html   (키: ${CONFIG.adminKey})`);
     console.log(`${bar}`);
     console.log(`  문제 ${BANK.pool.length}개 · 서든데스 ${BANK.sudden.length}개 · 명부 ${ROSTER.size}명`);
-    console.log(`${bar}\n`);
+    console.log(`${bar}`);
+
+    // 기본 운영 키는 공개 저장소에 그대로 들어 있다.
+    // 외부에 노출한 채로 쓰면 URL을 아는 누구나 회차를 리셋할 수 있다.
+    if (CONFIG.adminKey === 'kipi') {
+      console.log('  ⚠  운영 키가 기본값입니다. 사내망 밖으로 공개할 때는 반드시 바꾸세요.');
+      console.log('     ADMIN_KEY=원하는키 node server.js');
+      console.log(`${bar}`);
+    }
+    console.log('');
   });
 }
 
