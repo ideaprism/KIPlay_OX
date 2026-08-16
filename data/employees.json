@@ -1,5 +1,13 @@
 {
-  "_note": "MVP 데모용 직원 명부. 실제 운영 시 사내 SSO 또는 인사 데이터 연동으로 대체한다. 이름과 부서는 모두 가상이다.",
+  "_note": "MVP 데모용 직원 명부. 실제 운영 시 사내 SSO 또는 인사 데이터 연동으로 대체한다. 이름은 모두 가상이다.",
+
+  "_divisions": [
+    "본부/센터/단 5개 + 기타 1개, 총 6색이다. 14개 부서를 각각 색으로 구분하면 전광판에서 읽히지 않아",
+    "상위 조직 단위로 묶었다. 부서명은 카메라가 가까워지는 LOD 구간에서 텍스트로 노출된다.",
+    "",
+    "★ 조직 이름은 아래 divisions.name 과 departments.name 만 실제 조직도에 맞게 바꾸면 된다.",
+    "  코드 수정은 필요 없다. 색을 바꾸려면 divisions.color 만 고친다."
+  ],
 
   "_idFormat": [
     "사번은 5자리다. 명부에 등록된 사번은 joinYear 값을 그대로 쓴다.",
@@ -15,39 +23,61 @@
     "defaultYears": 5
   },
 
+  "divisions": [
+    { "id": "mgmt", "name": "경영관리본부",     "short": "경영", "color": "#5B84F0" },
+    { "id": "util", "name": "정보활용본부",     "short": "활용", "color": "#2FC4D9" },
+    { "id": "sys",  "name": "정보시스템본부",   "short": "시스템", "color": "#A06CE8" },
+    { "id": "ai",   "name": "지능정보화센터",   "short": "지능", "color": "#BFD645" },
+    { "id": "plat", "name": "분석플랫폼지원단", "short": "분석", "color": "#EE6BA8" },
+    { "id": "etc",  "name": "감사·원장실",      "short": "기타", "color": "#8B93B0" }
+  ],
+
   "departments": [
-    "지능정보기술실",
-    "데이터실",
-    "특허정보사업실",
-    "정보서비스실",
-    "고객지원실",
-    "심사지원실",
-    "경영지원실"
+    { "name": "전략기획실",       "division": "mgmt" },
+    { "name": "경영지원실",       "division": "mgmt" },
+
+    { "name": "IP정보확산실",     "division": "util" },
+    { "name": "IP정보가공실",     "division": "util" },
+    { "name": "IP고객상담실",     "division": "util" },
+
+    { "name": "IP시스템전략실",   "division": "sys" },
+    { "name": "IP시스템운영실",   "division": "sys" },
+    { "name": "IP시스템기반실",   "division": "sys" },
+
+    { "name": "지능정보전략실",   "division": "ai" },
+    { "name": "지능정보기술실",   "division": "ai" },
+    { "name": "지능정보데이터실", "division": "ai" },
+
+    { "name": "분석플랫폼전략실", "division": "plat" },
+    { "name": "데이터관리실",     "division": "plat" },
+
+    { "name": "감사팀",           "division": "etc" },
+    { "name": "원장실",           "division": "etc" }
   ],
 
   "roster": [
     { "empId": "95001", "name": "김원장", "dept": "원장실", "joinYear": 1995, "vip": true, "title": "원장" },
-    { "empId": "03014", "name": "박운영", "dept": "경영지원실", "joinYear": 2003, "vip": true, "title": "운영실장" },
+    { "empId": "03014", "name": "박운영", "dept": "경영지원실", "joinYear": 2003, "vip": true, "title": "경영관리본부장" },
 
-    { "empId": "05021", "name": "이정보", "dept": "특허정보사업실", "joinYear": 2005 },
-    { "empId": "08033", "name": "최데이터", "dept": "데이터실", "joinYear": 2008 },
+    { "empId": "05021", "name": "이정보", "dept": "IP정보확산실", "joinYear": 2005 },
+    { "empId": "08033", "name": "최데이터", "dept": "지능정보데이터실", "joinYear": 2008 },
     { "empId": "10007", "name": "정지능", "dept": "지능정보기술실", "joinYear": 2010 },
-    { "empId": "11045", "name": "강서비스", "dept": "정보서비스실", "joinYear": 2011 },
-    { "empId": "13018", "name": "윤심사", "dept": "심사지원실", "joinYear": 2013 },
-    { "empId": "14062", "name": "장고객", "dept": "고객지원실", "joinYear": 2014 },
-    { "empId": "15029", "name": "임특허", "dept": "특허정보사업실", "joinYear": 2015 },
-    { "empId": "16011", "name": "한분석", "dept": "데이터실", "joinYear": 2016 },
+    { "empId": "11045", "name": "강서비스", "dept": "IP고객상담실", "joinYear": 2011 },
+    { "empId": "13018", "name": "윤심사", "dept": "IP정보가공실", "joinYear": 2013 },
+    { "empId": "14062", "name": "장고객", "dept": "IP고객상담실", "joinYear": 2014 },
+    { "empId": "15029", "name": "임특허", "dept": "IP정보확산실", "joinYear": 2015 },
+    { "empId": "16011", "name": "한분석", "dept": "분석플랫폼전략실", "joinYear": 2016 },
     { "empId": "17054", "name": "오모델", "dept": "지능정보기술실", "joinYear": 2017 },
-    { "empId": "18003", "name": "신검색", "dept": "정보서비스실", "joinYear": 2018 },
-    { "empId": "19037", "name": "권상담", "dept": "고객지원실", "joinYear": 2019 },
-    { "empId": "20025", "name": "황출원", "dept": "심사지원실", "joinYear": 2020 },
-    { "empId": "21049", "name": "안기획", "dept": "경영지원실", "joinYear": 2021 },
-    { "empId": "22016", "name": "송개발", "dept": "지능정보기술실", "joinYear": 2022 },
-    { "empId": "23008", "name": "배수집", "dept": "데이터실", "joinYear": 2023 },
+    { "empId": "18003", "name": "신검색", "dept": "IP시스템운영실", "joinYear": 2018 },
+    { "empId": "19037", "name": "권상담", "dept": "IP고객상담실", "joinYear": 2019 },
+    { "empId": "20025", "name": "황출원", "dept": "IP정보가공실", "joinYear": 2020 },
+    { "empId": "21049", "name": "안기획", "dept": "전략기획실", "joinYear": 2021 },
+    { "empId": "22016", "name": "송개발", "dept": "IP시스템기반실", "joinYear": 2022 },
+    { "empId": "23008", "name": "배수집", "dept": "데이터관리실", "joinYear": 2023 },
 
     { "empId": "25012", "name": "문신입", "dept": "지능정보기술실", "joinYear": 2025 },
-    { "empId": "25034", "name": "유주니어", "dept": "데이터실", "joinYear": 2025 },
-    { "empId": "26005", "name": "조새싹", "dept": "정보서비스실", "joinYear": 2026 },
-    { "empId": "26019", "name": "차루키", "dept": "특허정보사업실", "joinYear": 2026 }
+    { "empId": "25034", "name": "유주니어", "dept": "데이터관리실", "joinYear": 2025 },
+    { "empId": "26005", "name": "조새싹", "dept": "IP시스템전략실", "joinYear": 2026 },
+    { "empId": "26019", "name": "차루키", "dept": "지능정보전략실", "joinYear": 2026 }
   ]
 }

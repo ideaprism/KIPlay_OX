@@ -492,6 +492,19 @@ body[data-demo="1"] .screen {
 
 .timer.urgent .fill { background: linear-gradient(90deg, #B3352C, var(--out)); }
 
+/* 군중 — 폰에서는 O/X 버튼이 여전히 최우선이므로 상단에 작게 둔다.
+   진짜 쇼는 전광판이 담당한다. */
+.crowd-box {
+  flex: 0 0 auto;
+  height: clamp(120px, 22vh, 200px);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+
+.crowd-box canvas { display: block; width: 100%; height: 100%; }
+
 .qbody {
   flex: 1 1 auto;
   display: flex;

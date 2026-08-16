@@ -7,9 +7,11 @@
 <link rel="stylesheet" href="style.css">
 <style>
 /* ═══════════════════════════════════════════════════════════
-   전광판 — 가독성이 분위기를 이긴다.
-   하드 그리드 라인, 낮은 라운딩, 그림자 최소, 글로우 금지.
-   기준은 사무실 3m 거리 판독. 200% 확대에서도 깨지지 않아야 한다.
+   전광판 — 군중이 주인공이다.
+   생존자 수는 숫자가 아니라 화면에 남아 있는 사람이고,
+   집계는 좌우로 갈라선 무리이고, 탈락은 올라가는 층에 못 탄 것이다.
+
+   가독성이 분위기를 이긴다는 원칙은 그대로다. 기준은 3m 판독.
    ═══════════════════════════════════════════════════════════ */
 
 body { overflow: hidden; }
@@ -20,8 +22,8 @@ body { overflow: hidden; }
   inset: 0;
   display: grid;
   grid-template-rows: auto 1fr;
-  grid-template-columns: 1fr minmax(280px, 24vw);
-  grid-template-areas: "head head" "main side";
+  grid-template-columns: 1fr minmax(250px, 20vw);
+  grid-template-areas: "head head" "stage side";
   background: var(--ground);
 }
 
@@ -31,231 +33,153 @@ body { overflow: hidden; }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 24px;
-  padding: 18px clamp(20px, 2.4vw, 40px);
+  gap: 20px;
+  padding: 14px clamp(18px, 2vw, 36px);
   border-bottom: 2px solid var(--line-2);
+  z-index: 3;
 }
 
 .bhead .logo {
   font-family: var(--mono);
   font-variant-numeric: tabular-nums;
-  font-size: clamp(28px, 3vw, 44px);
+  font-size: clamp(24px, 2.6vw, 40px);
   font-weight: 700;
   letter-spacing: -0.045em;
 }
 
 .bhead .logo .colon { color: var(--amber); }
 
-.bhead .meta {
-  display: flex;
-  gap: clamp(16px, 2vw, 36px);
-  align-items: baseline;
-  font-family: var(--mono);
-  font-variant-numeric: tabular-nums;
-}
-
-.bhead .meta div { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
-.bhead .meta .k { font-size: clamp(10px, 0.8vw, 13px); letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-3); }
-.bhead .meta .v { font-size: clamp(20px, 2vw, 30px); font-weight: 700; letter-spacing: -0.03em; }
+.bhead .meta { display: flex; gap: clamp(14px, 1.8vw, 32px); align-items: baseline; }
+.bhead .meta div { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
+.bhead .meta .k { font-family: var(--mono); font-size: clamp(9px, 0.75vw, 12px); letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-3); }
+.bhead .meta .v { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: clamp(18px, 1.8vw, 28px); font-weight: 700; letter-spacing: -0.03em; }
 
 .vip-flag {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 14px;
-  border: 2px solid var(--amber);
-  color: var(--amber);
-  font-weight: 700;
-  font-size: clamp(13px, 1.2vw, 18px);
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 12px; border: 2px solid var(--amber); color: var(--amber);
+  font-weight: 700; font-size: clamp(12px, 1.1vw, 17px);
 }
-
 .vip-flag[data-alive="false"] { border-color: var(--out); color: var(--out); }
 
-/* ── 본문 */
-.bmain {
-  grid-area: main;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: clamp(20px, 3vh, 44px);
-  padding: clamp(20px, 3vw, 56px);
-  min-width: 0;
+/* ── 무대 */
+.stage { grid-area: stage; position: relative; min-width: 0; overflow: hidden; }
+#stage-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+.stage-ui {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; justify-content: space-between;
+  padding: clamp(16px, 2.2vw, 40px);
+  pointer-events: none;
 }
 
 .bq {
-  font-size: clamp(28px, 3.6vw, 62px);
-  font-weight: 700;
-  line-height: 1.32;
-  letter-spacing: -0.025em;
-  margin: 0;
-  text-wrap: balance;
+  font-size: clamp(22px, 2.9vw, 50px);
+  font-weight: 700; line-height: 1.3; letter-spacing: -0.025em;
+  margin: 0; max-width: 88%; text-wrap: balance;
+  text-shadow: 0 3px 18px rgba(0,0,0,.85), 0 1px 3px rgba(0,0,0,.9);
 }
 
-.bcount { display: flex; align-items: baseline; gap: clamp(14px, 1.6vw, 28px); }
+.stage-foot { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; }
 
+.bcount { display: flex; align-items: baseline; gap: clamp(10px, 1.2vw, 20px); }
 .bcount .n {
-  font-family: var(--mono);
-  font-variant-numeric: tabular-nums;
-  font-size: clamp(76px, 13vw, 220px);
-  font-weight: 700;
-  line-height: 0.86;
-  letter-spacing: -0.055em;
-  color: var(--live);
+  font-family: var(--mono); font-variant-numeric: tabular-nums;
+  font-size: clamp(56px, 9vw, 150px); font-weight: 700; line-height: 0.84;
+  letter-spacing: -0.055em; color: var(--live);
+  text-shadow: 0 4px 24px rgba(0,0,0,.75);
 }
+.bcount .k { font-family: var(--mono); font-size: clamp(11px, 1.1vw, 18px); letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink-2); }
+.bcount .drop { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: clamp(18px, 1.9vw, 32px); font-weight: 700; color: var(--out); }
 
-.bcount .k {
-  font-family: var(--mono);
-  font-size: clamp(14px, 1.3vw, 22px);
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: var(--ink-3);
-}
+.split { display: flex; flex-direction: column; gap: 6px; min-width: clamp(160px, 20vw, 320px); }
+.split-nums { display: flex; justify-content: space-between; font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: clamp(15px, 1.6vw, 26px); font-weight: 700; }
+.split-bar { display: flex; height: clamp(10px, 1.2vh, 18px); background: rgba(255,255,255,.12); overflow: hidden; }
+.split-bar span { display: block; transition: width 260ms cubic-bezier(.25,.46,.45,.94); }
+.split-bar .s-o { background: var(--ink-2); }
+.split-bar .s-x { background: var(--surface-3); }
+.split.hidden .split-bar { background: repeating-linear-gradient(90deg, rgba(255,255,255,.12) 0 6px, transparent 6px 12px); }
+.split.hidden .split-nums { color: var(--ink-3); }
 
-.bcount .drop {
-  font-family: var(--mono);
-  font-variant-numeric: tabular-nums;
-  font-size: clamp(20px, 2vw, 34px);
-  font-weight: 700;
-  color: var(--out);
-}
-
-/* ── 집계 */
-.btally { display: flex; flex-direction: column; gap: 12px; }
-
-.brow { display: grid; grid-template-columns: 54px 1fr 130px; gap: 16px; align-items: center; }
-
-.brow .g {
-  font-family: var(--mono);
-  font-size: clamp(28px, 2.6vw, 44px);
-  font-weight: 700;
-  line-height: 1;
-}
-
-.brow .track { height: clamp(22px, 2.4vh, 38px); background: var(--surface-2); overflow: hidden; }
-
-.brow .fill {
-  height: 100%;
-  width: 0%;
-  background: var(--ink-2);
-  transition: width 260ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
-}
-
-.brow.x .fill { background: var(--surface-3); }
-.brow.hit .fill { background: var(--live); }
-.brow.miss .fill { background: var(--out); opacity: 0.55; }
-
-.brow .n {
-  font-family: var(--mono);
-  font-variant-numeric: tabular-nums;
-  font-size: clamp(22px, 2.2vw, 38px);
-  font-weight: 700;
-  text-align: right;
-  letter-spacing: -0.03em;
-}
-
-/* ── 타이머 (하드 바) */
-.btimer { height: 10px; background: var(--surface-2); overflow: hidden; }
+.btimer { height: 8px; background: rgba(255,255,255,.14); overflow: hidden; margin-bottom: 12px; }
 .btimer .fill { height: 100%; background: var(--amber); transform-origin: left center; }
 .btimer.urgent .fill { background: var(--out); }
 
-/* ── 사이드 피드 */
-.bside {
-  grid-area: side;
-  border-left: 2px solid var(--line-2);
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
+/* ── 사이드 */
+.bside { grid-area: side; border-left: 2px solid var(--line-2); display: flex; flex-direction: column; min-height: 0; }
+
+.tower-box { display: flex; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--line); align-items: stretch; }
+#tower-canvas { width: 44px; height: clamp(120px, 18vh, 200px); }
+.tower-info { display: flex; flex-direction: column; justify-content: center; gap: 3px; }
+.tower-info .f { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: clamp(26px, 2.6vw, 40px); font-weight: 700; letter-spacing: -0.04em; color: var(--amber); line-height: 1; }
+.tower-info .s { font-size: clamp(12px, 1.1vw, 16px); color: var(--ink-2); }
+
+.divlegend { display: flex; flex-wrap: wrap; gap: 5px 10px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+.divlegend div { display: flex; align-items: center; gap: 5px; font-size: clamp(10px, 0.85vw, 13px); color: var(--ink-2); }
+.divlegend i { width: 9px; height: 9px; border-radius: 2px; display: block; }
 
 .bside h2 {
-  margin: 0;
-  padding: 16px 20px;
-  font-family: var(--mono);
-  font-size: clamp(11px, 0.9vw, 14px);
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: var(--ink-3);
-  border-bottom: 1px solid var(--line);
-  font-weight: 600;
+  margin: 0; padding: 12px 16px;
+  font-family: var(--mono); font-size: clamp(10px, 0.85vw, 13px);
+  letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink-3);
+  border-bottom: 1px solid var(--line); font-weight: 600;
 }
 
 .feed { flex: 1; overflow: hidden; display: flex; flex-direction: column-reverse; justify-content: flex-end; }
-
 .feed-item {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  padding: 11px 20px;
-  border-bottom: 1px solid var(--line);
-  font-size: clamp(14px, 1.1vw, 19px);
-  animation: slidein 300ms cubic-bezier(0.215, 0.61, 0.355, 1);
+  display: flex; align-items: baseline; gap: 8px;
+  padding: 9px 16px; border-bottom: 1px solid var(--line);
+  font-size: clamp(13px, 1vw, 17px);
+  animation: slidein 300ms cubic-bezier(.215,.61,.355,1);
 }
-
 @keyframes slidein { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: none; } }
-
 .feed-item .nm { font-weight: 700; }
-.feed-item .dp { color: var(--ink-3); font-size: 0.82em; }
-.feed-item .q { margin-left: auto; font-family: var(--mono); font-size: 0.8em; color: var(--ink-3); }
+.feed-item .dp { color: var(--ink-3); font-size: 0.8em; }
+.feed-item .q { margin-left: auto; font-family: var(--mono); font-size: 0.78em; color: var(--ink-3); }
 .feed-item.revived { color: var(--live); }
 .feed-item.vip .nm { color: var(--amber); }
 
-/* ── 대기 / 결과 오버레이 */
+/* ── 중앙 오버레이 (대기 / 결과 / 오디오 잠금) */
 .bcenter {
-  grid-area: main;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  gap: clamp(12px, 2vh, 28px);
-  padding: clamp(20px, 3vw, 56px);
-  text-align: center;
+  position: absolute; inset: 0; z-index: 4;
+  display: flex; flex-direction: column; justify-content: center; align-items: center;
+  gap: clamp(10px, 1.8vh, 24px); padding: clamp(20px, 3vw, 56px); text-align: center;
+  background: linear-gradient(180deg, rgba(14,16,32,.82), rgba(14,16,32,.94));
 }
 
 .bcenter .huge {
-  font-family: var(--mono);
-  font-variant-numeric: tabular-nums;
-  font-size: clamp(88px, 17vw, 300px);
-  font-weight: 700;
-  line-height: 0.86;
-  letter-spacing: -0.055em;
-  color: var(--amber);
+  font-family: var(--mono); font-variant-numeric: tabular-nums;
+  font-size: clamp(76px, 15vw, 260px); font-weight: 700; line-height: 0.86;
+  letter-spacing: -0.055em; color: var(--amber);
+}
+.bcenter .champ-name { font-size: clamp(44px, 7vw, 116px); font-weight: 700; letter-spacing: -0.04em; line-height: 1.02; }
+.bcenter .sub { font-size: clamp(15px, 1.5vw, 26px); color: var(--ink-2); }
+.bcenter .floor-badge {
+  font-family: var(--mono); font-size: clamp(16px, 1.7vw, 28px); font-weight: 700;
+  color: var(--amber); border: 2px solid var(--amber); padding: 4px 16px; letter-spacing: 0.04em;
 }
 
-.bcenter .champ-name {
-  font-size: clamp(48px, 8vw, 128px);
-  font-weight: 700;
-  letter-spacing: -0.04em;
-  line-height: 1.02;
-}
-
-.bcenter .sub { font-size: clamp(16px, 1.6vw, 28px); color: var(--ink-2); }
-
-.blist { display: flex; flex-direction: column; width: min(760px, 100%); border-top: 1px solid var(--line); }
-
+.blist { display: flex; flex-direction: column; width: min(720px, 100%); border-top: 1px solid var(--line); max-height: 34vh; overflow: hidden; }
 .blist .row {
-  display: grid;
-  grid-template-columns: 56px 1fr auto;
-  gap: 14px;
-  align-items: center;
-  padding: 10px 8px;
-  border-bottom: 1px solid var(--line);
-  font-size: clamp(15px, 1.3vw, 22px);
-  text-align: left;
+  display: grid; grid-template-columns: 48px 1fr auto; gap: 12px; align-items: center;
+  padding: 8px; border-bottom: 1px solid var(--line);
+  font-size: clamp(14px, 1.2vw, 20px); text-align: left;
 }
-
 .blist .row .r { font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--ink-3); font-weight: 700; }
-.blist .row .s { font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--ink-3); font-size: 0.82em; }
+.blist .row .s { font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--ink-3); font-size: 0.8em; }
+
+#audio-gate { cursor: pointer; }
+#audio-gate .btn { pointer-events: auto; font-size: 20px; padding: 18px 40px; }
 
 [hidden] { display: none !important; }
 
 @media (max-width: 900px) {
-  .board { grid-template-columns: 1fr; grid-template-areas: "head" "main"; }
+  .board { grid-template-columns: 1fr; grid-template-areas: "head" "stage"; }
   .bside { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .feed-item { animation: none; }
-  .brow .fill { transition: none; }
+  .split-bar span { transition: none; }
 }
 </style>
 </head>
@@ -272,39 +196,67 @@ body { overflow: hidden; }
     <div class="vip-flag" id="b-vip" hidden><span>👑</span><span id="b-vip-text"></span></div>
   </header>
 
-  <!-- 진행 중 -->
-  <main class="bmain" id="b-play" hidden>
-    <div class="btimer" id="b-timer"><div class="fill" id="b-timer-fill"></div></div>
-    <h1 class="bq" id="b-question"></h1>
+  <main class="stage">
+    <canvas id="stage-canvas"></canvas>
 
-    <div class="bcount">
-      <span class="n mono" id="b-alive">0</span>
-      <div style="display:flex;flex-direction:column;gap:6px">
-        <span class="k">생존</span>
-        <span class="drop mono" id="b-drop"></span>
+    <div class="stage-ui">
+      <h1 class="bq" id="b-question"></h1>
+
+      <div>
+        <div class="btimer" id="b-timer"><div class="fill" id="b-timer-fill"></div></div>
+        <div class="stage-foot">
+          <div class="bcount">
+            <span class="n mono" id="b-alive">0</span>
+            <div style="display:flex;flex-direction:column;gap:4px">
+              <span class="k">생존</span>
+              <span class="drop mono" id="b-drop"></span>
+            </div>
+          </div>
+
+          <div class="split" id="b-split">
+            <div class="split-nums mono"><span id="b-num-o">O —</span><span id="b-num-x">— X</span></div>
+            <div class="split-bar"><span class="s-o" id="b-fill-o"></span><span class="s-x" id="b-fill-x"></span></div>
+          </div>
+        </div>
       </div>
     </div>
 
-    <div class="btally">
-      <div class="brow" id="b-row-o"><span class="g mono">O</span><div class="track"><div class="fill" id="b-fill-o"></div></div><span class="n mono" id="b-num-o">0</span></div>
-      <div class="brow x" id="b-row-x"><span class="g mono">X</span><div class="track"><div class="fill" id="b-fill-x"></div></div><span class="n mono" id="b-num-x">0</span></div>
-    </div>
+    <!-- 대기 / 결과 -->
+    <section class="bcenter" id="b-center">
+      <div class="label" id="b-center-label">대기 중</div>
+      <div class="huge mono" id="b-center-big">12:55</div>
+      <div class="floor-badge" id="b-center-floor" hidden></div>
+      <div class="sub" id="b-center-sub">매주 월요일 점심시간 마지막 5분</div>
+      <div class="blist" id="b-center-list" hidden></div>
+    </section>
+
+    <!-- 오디오 잠금 해제. 브라우저는 클릭 전에는 소리를 못 낸다. -->
+    <section class="bcenter" id="audio-gate">
+      <div class="label">전광판 준비</div>
+      <div class="huge mono" style="font-size:clamp(56px,10vw,150px)">12:55</div>
+      <div class="sub">징과 나레이션을 켜려면 한 번 눌러주세요</div>
+      <button class="btn btn-primary" id="audio-go">준비 완료</button>
+    </section>
   </main>
 
-  <!-- 대기 / 결과 -->
-  <section class="bcenter" id="b-center">
-    <div class="label" id="b-center-label">대기 중</div>
-    <div class="huge mono" id="b-center-big">--:--</div>
-    <div class="sub" id="b-center-sub"></div>
-    <div class="blist" id="b-center-list" hidden></div>
-  </section>
-
   <aside class="bside">
+    <div class="tower-box">
+      <canvas id="tower-canvas"></canvas>
+      <div class="tower-info">
+        <span class="f mono" id="t-floor">1F</span>
+        <span class="s" id="t-scene">로비</span>
+      </div>
+    </div>
+
+    <div class="divlegend" id="b-legend"></div>
+
     <h2>탈락</h2>
     <div class="feed" id="b-feed"></div>
   </aside>
 </div>
 
+<script src="crowd.js"></script>
+<script src="sfx.js"></script>
 <script src="board.js"></script>
 </body>
 </html>

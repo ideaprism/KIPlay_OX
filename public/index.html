@@ -114,6 +114,8 @@
 
   <div class="timer" id="q-timer"><div class="fill" id="q-timer-fill"></div></div>
 
+  <div class="crowd-box"><canvas id="crowd-canvas"></canvas></div>
+
   <div class="qbody">
     <span class="diff" id="q-diff" data-d="easy"><i></i><i></i><i></i> <span id="q-diff-text">쉬움</span></span>
     <h1 class="qtext" id="q-text"></h1>
@@ -179,6 +181,8 @@
     <span class="qnum mono">Q <b id="w-index">01</b> / <span id="w-total">05</span></span>
     <span class="alive-chip mono"><i class="dot"></i><span id="w-alive">0</span> 생존</span>
   </header>
+
+  <div class="crowd-box"><canvas id="watch-canvas"></canvas></div>
 
   <div class="watch-body">
     <span class="dead-mark">탈락</span>
@@ -247,6 +251,8 @@
   </div>
 </section>
 
+<script src="crowd.js"></script>
+<script src="sfx.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

@@ -1,0 +1,184 @@
+'use strict';
+
+/**
+ * 12:55 — 소리
+ *
+ * 모든 소리를 런타임에 합성한다. 음원 파일도 네트워크 요청도 없다.
+ * 브라우저는 사용자가 한 번 누르기 전에는 소리를 내지 못하므로 unlock()을 먼저 호출해야 한다.
+ * 참여자 폰은 로그인 버튼에서 자연히 풀리고, 전광판은 준비 화면의 버튼이 그 역할을 한다.
+ *
+ * 나레이션은 브라우저 내장 음성 합성을 쓴다. 기계적인 톤이 이 게임에 오히려 맞고,
+ * 파일도 네트워크도 필요 없다.
+ */
+
+(function (global) {
+  const Sfx = {
+    ctx: null,
+    noiseBuf: null,
+    muted: false,
+
+    unlock() {
+      if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return true; }
+      const AC = global.AudioContext || global.webkitAudioContext;
+      if (!AC) return false;
+      this.ctx = new AC();
+      if (this.ctx.state === 'suspended') this.ctx.resume();
+      return true;
+    },
+
+    /**
+     * 출력단 리미터.
+     * 징의 피크가 0.93까지 올라가는데 여기에 다른 소리가 겹치면 찢어진다.
+     * 모든 소리를 컴프레서로 보내 겹쳐도 깨지지 않게 한다.
+     */
+    get master() {
+      if (this._master && this._masterCtx === this.ctx) return this._master;
+      const comp = this.ctx.createDynamicsCompressor();
+      comp.threshold.setValueAtTime(-8, this.ctx.currentTime);
+      comp.knee.setValueAtTime(12, this.ctx.currentTime);
+      comp.ratio.setValueAtTime(6, this.ctx.currentTime);
+      comp.attack.setValueAtTime(0.004, this.ctx.currentTime);
+      comp.release.setValueAtTime(0.25, this.ctx.currentTime);
+      comp.connect(this.ctx.destination);
+      this._master = comp;
+      this._masterCtx = this.ctx;
+      return comp;
+    },
+
+    _noise(seconds = 0.4) {
+      if (this.noiseBuf) return this.noiseBuf;
+      const n = Math.floor(this.ctx.sampleRate * seconds);
+      const buf = this.ctx.createBuffer(1, n, this.ctx.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < n; i += 1) d[i] = Math.random() * 2 - 1;
+      this.noiseBuf = buf;
+      return buf;
+    },
+
+    /** 단순 음. 짧은 신호음에 쓴다. */
+    tone({ freq, to, dur = 0.12, type = 'sine', gain = 0.14, delay = 0 }) {
+      if (!this.ctx || this.muted) return;
+      const t0 = this.ctx.currentTime + delay;
+      const osc = this.ctx.createOscillator();
+      const amp = this.ctx.createGain();
+
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, t0);
+      if (to) osc.frequency.exponentialRampToValueAtTime(Math.max(20, to), t0 + dur);
+
+      amp.gain.setValueAtTime(0.0001, t0);
+      amp.gain.exponentialRampToValueAtTime(gain, t0 + 0.012);
+      amp.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+
+      osc.connect(amp).connect(this.master);
+      osc.start(t0);
+      osc.stop(t0 + dur + 0.02);
+      osc.onended = () => { osc.disconnect(); amp.disconnect(); };
+    },
+
+    /**
+     * 징.
+     *
+     * 징은 배음이 정수배가 아니라서 단순 오실레이터로는 "댕" 소리밖에 안 난다.
+     * 어긋난 비율의 배음을 여러 개 쌓고, 각각 다른 속도로 감쇠시키고,
+     * 살짝 어긋난 쌍을 겹쳐 맥놀이를 만들고, 타격 순간에 노이즈를 얹는다.
+     */
+    gong({ freq = 92, dur = 4.2, gain = 0.5, delay = 0 } = {}) {
+      if (!this.ctx || this.muted) return;
+      const ctx = this.ctx;
+      const t0 = ctx.currentTime + delay;
+
+      const master = ctx.createGain();
+      master.gain.setValueAtTime(gain, t0);
+      master.connect(this.master);
+
+      // 타격음 — 금속을 때리는 순간의 잡음
+      const noise = ctx.createBufferSource();
+      noise.buffer = this._noise();
+      const nf = ctx.createBiquadFilter();
+      nf.type = 'bandpass';
+      nf.frequency.setValueAtTime(2600, t0);
+      nf.frequency.exponentialRampToValueAtTime(700, t0 + 0.3);
+      nf.Q.value = 0.7;
+      const ng = ctx.createGain();
+      ng.gain.setValueAtTime(0.55, t0);
+      ng.gain.exponentialRampToValueAtTime(0.0005, t0 + 0.32);
+      noise.connect(nf).connect(ng).connect(master);
+      noise.start(t0);
+      noise.stop(t0 + 0.4);
+
+      // 어긋난 배음들. 높은 배음일수록 빨리 죽는다.
+      const partials = [1, 1.48, 2.11, 2.87, 3.66, 4.51, 5.78, 7.12];
+      partials.forEach((ratio, i) => {
+        for (const cents of [-7, 7]) {   // 쌍을 어긋나게 겹쳐 맥놀이를 만든다
+          const osc = ctx.createOscillator();
+          osc.type = 'sine';
+          const f = freq * ratio;
+          osc.frequency.setValueAtTime(f * 1.015, t0);           // 타격 직후 살짝 높았다가
+          osc.frequency.exponentialRampToValueAtTime(f, t0 + 0.6); // 제자리로 내려온다
+          osc.detune.setValueAtTime(cents * (1 + i * 0.4), t0);
+
+          const g = ctx.createGain();
+          const amp = 0.5 / (1 + i * 0.85);
+          const decay = Math.max(0.45, dur * (1 - i * 0.1));
+          g.gain.setValueAtTime(0.0001, t0);
+          g.gain.exponentialRampToValueAtTime(amp, t0 + 0.006 + i * 0.006);
+          g.gain.exponentialRampToValueAtTime(0.0001, t0 + decay);
+
+          osc.connect(g).connect(master);
+          osc.start(t0);
+          osc.stop(t0 + dur + 0.15);
+          osc.onended = () => { osc.disconnect(); g.disconnect(); };
+        }
+      });
+
+      setTimeout(() => master.disconnect(), (delay + dur + 0.4) * 1000);
+    },
+
+    // ── 게임 신호음
+    select()   { this.tone({ freq: 520, to: 780, dur: 0.07, type: 'triangle', gain: 0.11 }); },
+    tick()     { this.tone({ freq: 880, dur: 0.04, type: 'square', gain: 0.07 }); },
+    countTick(n) { this.tone({ freq: 440 + (3 - n) * 110, dur: 0.09, type: 'square', gain: 0.1 }); },
+    warn()     { this.tone({ freq: 300, to: 420, dur: 0.16, type: 'square', gain: 0.1 }); },
+    correct()  { this.tone({ freq: 660, dur: 0.1, type: 'triangle', gain: 0.13 });
+                 this.tone({ freq: 990, dur: 0.18, type: 'triangle', gain: 0.12, delay: 0.1 }); },
+    dead()     { this.tone({ freq: 220, to: 55, dur: 0.6, type: 'sawtooth', gain: 0.13 }); },
+    champ()    { [523, 659, 784, 1047].forEach((f, i) =>
+                   this.tone({ freq: f, dur: 0.22, type: 'triangle', gain: 0.12, delay: i * 0.11 })); },
+
+    /** 층이 올라가는 소리 — 낮은 데서 높은 데로 미끄러진다 */
+    rise()     { this.tone({ freq: 180, to: 520, dur: 0.9, type: 'triangle', gain: 0.1 });
+                 this.tone({ freq: 90, to: 260, dur: 1.1, type: 'sine', gain: 0.08 }); },
+
+    // ── 나레이션
+    voice: null,
+
+    _pickVoice() {
+      if (!('speechSynthesis' in global)) return null;
+      if (this.voice) return this.voice;
+      const all = global.speechSynthesis.getVoices();
+      this.voice = all.find((v) => v.lang && v.lang.toLowerCase().startsWith('ko')) || null;
+      return this.voice;
+    },
+
+    say(text, { rate = 0.98, pitch = 0.9, force = false } = {}) {
+      if (!('speechSynthesis' in global) || this.muted || !text) return;
+      if (force) global.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = 'ko-KR';
+      u.rate = rate;
+      u.pitch = pitch;
+      const v = this._pickVoice();
+      if (v) u.voice = v;
+      global.speechSynthesis.speak(u);
+    },
+
+    silence() { if ('speechSynthesis' in global) global.speechSynthesis.cancel(); },
+  };
+
+  if ('speechSynthesis' in global) {
+    global.speechSynthesis.addEventListener('voiceschanged', () => { Sfx.voice = null; });
+  }
+
+  global.Sfx = Sfx;
+})(window);

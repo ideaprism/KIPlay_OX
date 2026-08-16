@@ -32,7 +32,23 @@ const CONFIG = {
   questionCount: 5,
   newbieYears: 2,     // 입사 N년 미만에게 부활권
   heartbeatMs: 15000, // SSE keep-alive
+
+  // 생존자가 이 수 미만이면 실시간 O/X 집계를 보내지 않는다.
+  // 초반은 군중을 보고 눈치를 보지만 후반은 혼자 판단해야 한다.
+  // 반드시 서버에서 잘라야 한다. 클라이언트에서만 숨기면 개발자도구로 그대로 보인다.
+  tallyVisibleFrom: 100,
 };
+
+/**
+ * 층 환경. 1층은 로비이고 그 위로는 사무실·심사실·서고·전산실이 순환한다.
+ * 옥상은 게임 층이 아니라 우승 장면 전용이다.
+ */
+const FLOOR_CYCLE = ['office', 'review', 'archive', 'datacenter'];
+
+function floorScene(floor) {
+  if (floor <= 1) return 'lobby';
+  return FLOOR_CYCLE[(floor - 2) % FLOOR_CYCLE.length];
+}
 
 const POINTS = { join: 5, survive: 10, champion: 50, beatVip: 30 };
 
@@ -50,7 +66,12 @@ let BANK = loadJson('questions.json');
 let STAFF = loadJson('employees.json');
 
 let ROSTER = new Map(STAFF.roster.map((r) => [r.empId, r]));
-let DEPTS = STAFF.departments;
+let DEPTS = STAFF.departments.map((d) => (typeof d === 'string' ? { name: d, division: 'etc' } : d));
+let DIVISIONS = STAFF.divisions || [{ id: 'etc', name: '기타', color: '#8B93B0' }];
+let DEPT_DIV = new Map(DEPTS.map((d) => [d.name, d.division]));
+let DIV_COLOR = new Map(DIVISIONS.map((d) => [d.id, d.color]));
+
+const divisionOf = (deptName) => DEPT_DIV.get(deptName) || 'etc';
 let ID = Object.assign({ digits: 5, yearPrefix: 2, defaultYears: 5 }, STAFF.idFormat || {});
 let ID_RE = new RegExp(`^\\d{${ID.digits}}$`);
 
@@ -83,11 +104,13 @@ function resolveEmployee(empId) {
   if (joinYear < 1960 || joinYear > nowYear) return null;
 
   const seq = Number(id.slice(ID.yearPrefix > 0 ? ID.yearPrefix : 0)) || 0;
+  const dept = known ? known.dept : DEPTS[seq % DEPTS.length].name;
 
   return {
     empId: id,
     name: known ? known.name : `직원 ${id}`,
-    dept: known ? known.dept : DEPTS[seq % DEPTS.length],
+    dept,
+    div: divisionOf(dept),
     title: known ? known.title || null : null,
     vip: known ? !!known.vip : false,
     years: nowYear - joinYear,
@@ -141,7 +164,8 @@ function spawnBots(count) {
       {
         empId: `${String(joinYear % 100).padStart(2, '0')}${String(100 + (i % 900)).padStart(3, '0')}`,
         name: makeBotName(i),
-        dept: DEPTS[i % DEPTS.length],
+        dept: DEPTS[i % DEPTS.length].name,
+        div: DEPTS[i % DEPTS.length].division,
         title: null,
         vip: false,
         years,
@@ -191,10 +215,14 @@ function scheduleBotSudden(participants) {
   }
 }
 
+const DIV_INDEX = new Map(DIVISIONS.map((d, i) => [d.id, i]));
+
 const game = {
   phase: 'idle', // idle | lobby | question | reveal | revive | sudden | result
   demo: false,
   round: 0,
+  floor: 1,      // 정답을 맞힌 쪽이 올라간다. 1층에서 시작한다.
+  crowd: [],     // 렌더러가 쓰는 고정 순서 배열. 인덱스가 곧 화면상의 사람이다.
   phaseEndsAt: 0,
 
   questions: [],
@@ -321,14 +349,61 @@ function tallyCounts() {
   return { o, x };
 }
 
+// ---------------------------------------------------------------- 군중 데이터
+//
+// 렌더러는 사람 하나하나를 그린다. 매 틱마다 450명의 객체를 보내면 대역폭이 낭비되므로
+// 회차 시작에 고정 순서 배열을 한 번 보내고, 그 뒤로는 인덱스 순서의 문자열 마스크만 보낸다.
+// 450명이 450바이트다.
+
+function buildCrowd() {
+  game.crowd = [...game.players.values()].filter((p) => p.eliminatedAt !== -1);
+  game.crowd.forEach((p, i) => { p.ci = i; });
+}
+
+function crowdPayload() {
+  return {
+    round: game.round,
+    n: game.crowd.length,
+    divisions: DIVISIONS,
+    div: game.crowd.map((p) => DIV_INDEX.get(p.div) ?? DIVISIONS.length - 1).join(''),
+    flags: game.crowd.map((p) => (p.vip ? 'v' : p.isNew ? 'n' : '.')).join(''),
+  };
+}
+
+const aliveMask = () => game.crowd.map((p) => (p.alive ? '1' : '0')).join('');
+
+/** 선택 방향까지 담는다. 생존자가 충분히 많을 때만 내보낸다. */
+const choiceMask = () => game.crowd.map((p) => (p.alive ? p.answer || '-' : '.')).join('');
+
+/** 방향은 감추고 "정했는지" 여부만 담는다. */
+const decidedMask = () => game.crowd.map((p) => (p.alive ? (p.answer ? '1' : '0') : '.')).join('');
+
+const tallyVisible = () => alivePlayers().length >= CONFIG.tallyVisibleFrom;
+
+/** 카메라가 가까워지는 구간에서만 이름을 붙인다. 인원이 적을 때만이라 양도 적다. */
+function namedPayload() {
+  const alive = alivePlayers();
+  if (alive.length > 30) return null;
+  return game.crowd
+    .filter((p) => p.alive)
+    .map((p) => ({ i: p.ci, name: p.name, empId: p.empId, dept: p.dept }));
+}
+
 function publicState() {
   const q = game.questions[game.qIndex] || null;
   const vip = vipPlayer();
+
+  const showTally = tallyVisible();
 
   return {
     phase: game.phase,
     demo: game.demo,
     round: game.round,
+    floor: game.floor,
+    scene: floorScene(game.floor),
+    tallyVisible: showTally,
+    aliveMask: game.crowd.length ? aliveMask() : null,
+    named: namedPayload(),
     phaseEndsAt: game.phaseEndsAt,
     serverNow: Date.now(),
     joined: game.players.size,
@@ -347,7 +422,8 @@ function publicState() {
     vip: vip ? { name: vip.name, title: vip.title, alive: vip.alive, dept: vip.dept } : null,
     feed: game.feed.slice(-14),
     result: game.result,
-    ...tallyCounts(),
+    // 진행 중에는 생존자가 충분히 많을 때만 집계를 보낸다. 정답 공개 뒤에는 항상 보낸다.
+    ...(game.phase === 'question' && !showTally ? { o: null, x: null } : tallyCounts()),
   };
 }
 
@@ -358,6 +434,8 @@ function personalState(p) {
       empId: p.empId,
       name: p.name,
       dept: p.dept,
+      div: p.div,
+      ci: p.ci ?? null,
       years: p.years,
       isNew: p.isNew,
       isVip: p.vip,
@@ -375,17 +453,29 @@ function personalState(p) {
   };
 }
 
+/** 군중 배열은 회차당 연결당 한 번만 보낸다. 그 뒤로는 마스크만 흐른다. */
+function withCrowd(res, payload) {
+  if (!game.crowd.length || res._crowdRound === game.round) return payload;
+  res._crowdRound = game.round;
+  return { ...payload, crowd: crowdPayload() };
+}
+
 function pushState() {
   for (const p of game.players.values()) {
-    if (p.res) sseSend(p.res, 'state', personalState(p));
+    if (p.res) sseSend(p.res, 'state', withCrowd(p.res, personalState(p)));
   }
   const pub = publicState();
-  for (const res of game.spectators) sseSend(res, 'state', pub);
+  for (const res of game.spectators) sseSend(res, 'state', withCrowd(res, pub));
 }
 
 function pushTally() {
-  const { o, x } = tallyCounts();
-  const payload = { o, x, alive: alivePlayers().length, joined: game.players.size };
+  const showTally = tallyVisible();
+  const payload = {
+    alive: alivePlayers().length,
+    joined: game.players.size,
+    tallyVisible: showTally,
+    ...(showTally ? { ...tallyCounts(), choices: choiceMask() } : { o: null, x: null, decided: decidedMask() }),
+  };
   for (const p of game.players.values()) if (p.res) sseSend(p.res, 'tally', payload);
   for (const res of game.spectators) sseSend(res, 'tally', payload);
 }
@@ -430,6 +520,8 @@ function startGame(lobbyMs, opts = {}) {
   game.questions = pickQuestions();
   game.suddenQ = BANK.sudden[Math.floor(Math.random() * BANK.sudden.length)];
   game.qIndex = -1;
+  game.floor = 1;
+  game.crowd = [];
   game.lastReveal = null;
   game.result = null;
   game.feed = [];
@@ -451,6 +543,8 @@ function beginQuestion(index) {
   game.phaseEndsAt = Date.now() + CONFIG.questionMs;
   game.lastReveal = null;
 
+  if (index === 0) buildCrowd(); // 첫 문항 시점의 참가자가 이 회차의 군중이다
+
   for (const p of game.players.values()) {
     p.answer = null;
     p.rt = null;
@@ -467,6 +561,10 @@ function revealQuestion() {
   clearTimers();
   const q = game.questions[game.qIndex];
   const { o, x } = tallyCounts();
+
+  // 탈락을 적용하기 전에 찍어야 한다. 나중에 만들면 살아남은 쪽 답만 남아
+  // 전원이 같은 선택을 한 것처럼 보인다.
+  const choicesAtReveal = game.crowd.length ? choiceMask() : null;
 
   const eliminated = [];
   for (const p of game.players.values()) {
@@ -487,22 +585,32 @@ function revealQuestion() {
     game.feed.push({ name: p.name, dept: p.dept, q: game.qIndex + 1, vip: p.vip });
   }
 
+  const survivors = alivePlayers().length;
+  const fromFloor = game.floor;
+  if (survivors > 0) game.floor += 1; // 정답 쪽 바닥이 올라간다
+
+  // 층 상승 연출이 끝나기 전에 게임이 넘어가면 안 된다. 인원이 적을수록 길게 본다.
+  const revealMs = survivors > 0 ? (survivors <= 10 ? 6000 : survivors < 100 ? 5000 : 4000) : CONFIG.revealMs;
+
   game.phase = 'reveal';
-  game.phaseEndsAt = Date.now() + CONFIG.revealMs;
+  game.phaseEndsAt = Date.now() + revealMs;
   game.lastReveal = {
     answer: q.answer,
     evidence: q.evidence,
     source: q.source,
     o,
     x,
+    choices: choicesAtReveal, // 공개 순간 전원의 선택이 드러난다
     eliminatedCount: eliminated.length,
     eliminatedNames: eliminated.slice(0, 8).map((p) => p.name),
-    alive: alivePlayers().length,
+    alive: survivors,
+    fromFloor,
+    toFloor: game.floor,
   };
   pushState();
 
   const candidates = eliminated.filter((p) => p.isNew && p.revives > 0);
-  schedule(CONFIG.revealMs, () => (candidates.length ? offerRevive(candidates) : nextStep()));
+  schedule(revealMs, () => (candidates.length ? offerRevive(candidates) : nextStep()));
 }
 
 function offerRevive(candidates) {
@@ -548,9 +656,12 @@ function nextStep() {
     return finish(null);
   }
 
+  // 한 명만 남으면 문항이 남았어도 거기서 끝난다.
+  // 그래야 "몇 층에서 챔피언이 나왔는지"가 회차마다 달라져 이야깃거리가 된다.
+  if (alive.length === 1) return finish(alive[0]);
+
   if (game.qIndex + 1 < game.questions.length) return beginQuestion(game.qIndex + 1);
-  if (alive.length >= 2) return beginSudden(alive);
-  return finish(alive[0]);
+  return beginSudden(alive);
 }
 
 function beginSudden(participants) {
@@ -633,8 +744,17 @@ function finish(champion) {
 
   game.result = {
     champion: champion
-      ? { name: champion.name, dept: champion.dept, isNew: champion.isNew, survived: champion.survived }
+      ? {
+          name: champion.name,
+          dept: champion.dept,
+          div: champion.div,
+          isNew: champion.isNew,
+          survived: champion.survived,
+          ci: champion.ci ?? null,
+        }
       : null,
+    floor: game.floor,      // 몇 층에서 챔피언이 나왔는가
+    scene: floorScene(game.floor),
     ranking,
     sudden: game.suddenResult || null,
     suddenAnswer: game.suddenQ ? { value: game.suddenQ.answer, unit: game.suddenQ.unit, evidence: game.suddenQ.evidence } : null,
@@ -653,6 +773,8 @@ function resetGame() {
   game.phase = 'idle';
   game.demo = false;
   game.qIndex = -1;
+  game.floor = 1;
+  game.crowd = [];
   game.phaseEndsAt = 0;
   game.lastReveal = null;
   game.result = null;
@@ -889,10 +1011,16 @@ async function handler(req, res) {
       BANK = loadJson('questions.json');
       STAFF = loadJson('employees.json');
       ROSTER = new Map(STAFF.roster.map((r) => [r.empId, r]));
-      DEPTS = STAFF.departments;
+      DEPTS = STAFF.departments.map((d) => (typeof d === 'string' ? { name: d, division: 'etc' } : d));
+      DIVISIONS = STAFF.divisions || DIVISIONS;
+      DEPT_DIV = new Map(DEPTS.map((d) => [d.name, d.division]));
+      DIV_COLOR = new Map(DIVISIONS.map((d) => [d.id, d.color]));
       ID = Object.assign({ digits: 5, yearPrefix: 2, defaultYears: 5 }, STAFF.idFormat || {});
       ID_RE = new RegExp(`^\\d{${ID.digits}}$`);
-      return sendJson(res, 200, { ok: true, pool: BANK.pool.length, roster: ROSTER.size, digits: ID.digits });
+      return sendJson(res, 200, {
+        ok: true, pool: BANK.pool.length, roster: ROSTER.size,
+        digits: ID.digits, divisions: DIVISIONS.length, departments: DEPTS.length,
+      });
     }
     return sendJson(res, 404, { error: 'unknown action' });
   }

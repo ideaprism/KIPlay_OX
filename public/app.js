@@ -25,49 +25,23 @@ const state = {
   retry: 0,
 };
 
-// ═══════════════════════════════════════════════ 오디오 (합성)
+// 소리는 sfx.js가 제공한다 (전광판과 공유). 첫 사용자 제스처에서 unlock() 해야 울린다.
 
-const Sfx = {
-  ctx: null,
+// ═══════════════════════════════════════════════ 군중 무대
+//
+// 폰에서는 O/X 버튼이 최우선이라 군중은 상단에 작게 둔다. compact 모드로 카메라를
+// 조금 더 당겨 인원이 많아도 사람이 보이게 한다. 진짜 쇼는 전광판이 담당한다.
 
-  unlock() {
-    if (this.ctx) return;
-    const AC = window.AudioContext || window.webkitAudioContext;
-    if (!AC) return;
-    this.ctx = new AC();
-    if (this.ctx.state === 'suspended') this.ctx.resume();
-  },
+const stages = { question: null, watch: null };
 
-  /** 완료된 노드는 자동 해제된다. 동시 발성은 짧은 길이로 자연히 제한된다. */
-  tone({ freq, to, dur = 0.12, type = 'sine', gain = 0.14, delay = 0 }) {
-    if (!this.ctx) return;
-    const t0 = this.ctx.currentTime + delay;
-    const osc = this.ctx.createOscillator();
-    const amp = this.ctx.createGain();
+function initStages() {
+  if (stages.question) return;
+  stages.question = new CrowdStage($('crowd-canvas'), { compact: true, labels: false });
+  stages.watch = new CrowdStage($('watch-canvas'), { compact: true, labels: false });
+  for (const s of Object.values(stages)) s.start();
+}
 
-    osc.type = type;
-    osc.frequency.setValueAtTime(freq, t0);
-    if (to) osc.frequency.exponentialRampToValueAtTime(Math.max(20, to), t0 + dur);
-
-    amp.gain.setValueAtTime(0.0001, t0);
-    amp.gain.exponentialRampToValueAtTime(gain, t0 + 0.012);
-    amp.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-
-    osc.connect(amp).connect(this.ctx.destination);
-    osc.start(t0);
-    osc.stop(t0 + dur + 0.02);
-    osc.onended = () => { osc.disconnect(); amp.disconnect(); };
-  },
-
-  select() { this.tone({ freq: 520, to: 780, dur: 0.07, type: 'triangle', gain: 0.11 }); },
-  tick()   { this.tone({ freq: 880, dur: 0.04, type: 'square', gain: 0.07 }); },
-  warn()   { this.tone({ freq: 300, to: 420, dur: 0.16, type: 'square', gain: 0.1 }); },
-  correct(){ this.tone({ freq: 660, dur: 0.1, type: 'triangle', gain: 0.13 });
-             this.tone({ freq: 990, dur: 0.18, type: 'triangle', gain: 0.12, delay: 0.1 }); },
-  dead()   { this.tone({ freq: 220, to: 55, dur: 0.6, type: 'sawtooth', gain: 0.13 }); },
-  champ()  { [523, 659, 784, 1047].forEach((f, i) =>
-               this.tone({ freq: f, dur: 0.22, type: 'triangle', gain: 0.12, delay: i * 0.11 })); },
-};
+const eachStage = (fn) => { for (const s of Object.values(stages)) if (s) fn(s); };
 
 // ═══════════════════════════════════════════════ 유틸
 
@@ -169,6 +143,10 @@ function render(s) {
   const me = s.me;
   if (!me) return;
 
+  initStages();
+  if (s.crowd) eachStage((st) => st.setCrowd(s.crowd));
+  eachStage((st) => { st.setState(s); if (me.ci !== null) st.setMyIndex(me.ci); });
+
   // ── 개인 카드
   $('me-name').textContent = me.name;
   $('me-dept').textContent = me.dept;
@@ -227,6 +205,7 @@ function render(s) {
     case 'reveal': {
       const r = s.reveal;
       if (r && phaseChanged) {
+        eachStage((st) => st.applyReveal(r));
         $('rv-answer').textContent = r.answer;
         $('rv-answer').className = 'verdict-glyph mono ' + (r.answer === 'O' ? 'verdict-ok' : 'verdict-no');
         $('rv-evidence').textContent = r.evidence || '';
@@ -288,17 +267,17 @@ function render(s) {
 }
 
 function renderTally(s) {
-  const o = s.o || 0;
-  const x = s.x || 0;
+  // 생존자가 100명 밑으로 떨어지면 서버가 집계를 보내지 않는다.
+  // 초반엔 군중을 보고 눈치를 보지만 후반은 혼자 판단해야 한다.
+  const hidden = s.tallyVisible === false || s.o === null || s.o === undefined;
+  const o = hidden ? 1 : s.o;
+  const x = hidden ? 1 : s.x;
   const total = Math.max(1, o + x);
-  $('bar-o').style.flexGrow = String(o / total);
-  $('bar-x').style.flexGrow = String(x / total);
-  $('w-bar-o').style.flexGrow = String(o / total);
-  $('w-bar-x').style.flexGrow = String(x / total);
-  $('num-o').textContent = o;
-  $('num-x').textContent = x;
-  $('w-num-o').textContent = o;
-  $('w-num-x').textContent = x;
+
+  for (const id of ['bar-o', 'w-bar-o']) $(id).style.flexGrow = String(o / total);
+  for (const id of ['bar-x', 'w-bar-x']) $(id).style.flexGrow = String(x / total);
+  for (const id of ['num-o', 'w-num-o']) $(id).textContent = hidden ? '?' : o;
+  for (const id of ['num-x', 'w-num-x']) $(id).textContent = hidden ? '?' : x;
 }
 
 function resetChoices() {
@@ -393,6 +372,11 @@ function connect() {
     renderTally(state.snap);
     $('q-alive').textContent = t.alive;
     $('w-alive').textContent = t.alive;
+    eachStage((st) => {
+      st.alive = t.alive;
+      if (t.choices) st.applyChoices(t.choices);
+      else if (t.decided) st.applyDecided(t.decided);
+    });
   });
 
   es.addEventListener('revive', () => Sfx.warn());

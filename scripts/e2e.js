@@ -139,9 +139,12 @@ function observe() {
   return { seen, close };
 }
 
-async function waitForResult(obs, timeoutMs = 90000) {
+// 층 상승 연출로 정답 공개가 4~6초로 늘어 한 판이 90초를 넘길 수 있다.
+// 5분 슬롯이 하드 제약이므로 실제 소요 시간도 함께 기록한다.
+async function waitForResult(obs, timeoutMs = 180000) {
   const t0 = Date.now();
   while (!obs.seen.result && Date.now() - t0 < timeoutMs) await sleep(200);
+  obs.elapsedMs = Date.now() - t0;
   return obs.seen.result;
 }
 
@@ -311,14 +314,18 @@ async function scenarioE() {
   ok(health.players === 41, `참가 인원 41명 (본인 1 + 봇 40) — 실제 ${health.players}`);
   ok(health.phase === 'lobby', '대기실 진입');
 
-  // 봇이 실제로 답하는지 — 문항 진행 중 집계를 확인한다
-  let sawSplit = false;
+  // 41명은 100명 미만이라 진행 중 집계가 가려져야 한다
   let sawDemoFlag = false;
+  let sawHidden = false;
+  let sawDeciding = false;
+  let leakedTally = false;
   let peakAlive = 0;
   const closeTally = sse('/api/spectate', (event, s) => {
     if (event === 'state' && s.demo) sawDemoFlag = true;
     if (event === 'tally') {
-      if (s.o > 0 && s.x > 0) sawSplit = true;
+      if (s.tallyVisible === false && s.o === null) sawHidden = true;
+      if (s.tallyVisible === false && (s.o !== null || s.x !== null)) leakedTally = true;
+      if (s.decided && s.decided.includes('1')) sawDeciding = true;
       peakAlive = Math.max(peakAlive, s.alive);
     }
   });
@@ -326,7 +333,14 @@ async function scenarioE() {
   const result = await waitForResult(obs);
 
   ok(sawDemoFlag, '상태에 체험 모드 표시가 실림 (화면에 안내 띠가 뜬다)');
-  ok(sawSplit, '봇들이 O/X로 갈려 응답 (집계 바가 양쪽에 찍힘)');
+  ok(sawHidden, '100명 미만이라 진행 중 O/X 집계가 가려짐');
+  ok(!leakedTally, '가려진 구간에서 집계가 새지 않음');
+  ok(sawDeciding, '방향은 감춰도 "선택함" 표시는 전달됨');
+
+  const firstReveal = obs.seen.reveals[0];
+  const split = firstReveal && firstReveal.choices &&
+    firstReveal.choices.includes('O') && firstReveal.choices.includes('X');
+  ok(split, '정답 공개 순간 전원의 선택이 O/X로 갈려 드러남');
   ok(peakAlive > 1, `한때 생존자 ${peakAlive}명 (봇 포함)`);
   ok(!!result, '체험 회차 정상 종료');
   ok(result && result.totalPlayers === 41, `결과 집계 41명 — 실제 ${result ? result.totalPlayers : '-'}`);
@@ -359,6 +373,58 @@ function get(path) {
   });
 }
 
+async function scenarioF() {
+  console.log('\n[F] 층 상승과 집계 가리기 경계 — 봇 150명');
+  await post('/api/admin/reset', { key: KEY });
+  await sleep(150);
+
+  const obs = observe();
+  const solo = await join('15029', () => (Math.random() < 0.5 ? 'O' : 'X'));
+  solo.suddenValue = 1000;
+  await sleep(250);
+
+  let visibleAbove = false;   // 100명 이상일 때 집계가 보였는가
+  let hiddenBelow = false;    // 100명 미만으로 떨어지자 가려졌는가
+  let leak = false;
+  let crowdSeen = null;
+  const floors = [];
+
+  const close = sse('/api/spectate', (event, s) => {
+    if (event === 'state') {
+      if (s.crowd) crowdSeen = s.crowd;
+      if (s.phase === 'reveal' && s.reveal) floors.push([s.reveal.fromFloor, s.reveal.toFloor]);
+    }
+    if (event === 'tally') {
+      if (s.alive >= 100 && s.tallyVisible && s.o !== null) visibleAbove = true;
+      if (s.alive < 100 && s.tallyVisible === false) hiddenBelow = true;
+      if (s.tallyVisible === false && s.o !== null) leak = true;
+    }
+  });
+
+  await post('/api/demo/start', { token: solo.token, bots: 150, lobbySec: 2 });
+  // 층 상승 연출로 정답 공개가 4~6초로 늘어나 한 판이 90초를 넘길 수 있다
+  const result = await waitForResult(obs, 180000);
+
+  ok(visibleAbove, '100명 이상 구간에서는 집계가 보임');
+  ok(hiddenBelow, '100명 미만으로 떨어지면 집계가 가려짐');
+  ok(!leak, '가려진 뒤로는 집계가 한 번도 새지 않음');
+
+  ok(crowdSeen && crowdSeen.n === 151, `군중 배열 ${crowdSeen ? crowdSeen.n : '-'}명 (본인 1 + 봇 150)`);
+  ok(crowdSeen && crowdSeen.div.length === crowdSeen.n, '본부 마스크 길이가 인원과 일치');
+  ok(crowdSeen && crowdSeen.divisions.length === 6, `본부 색 ${crowdSeen ? crowdSeen.divisions.length : '-'}개`);
+
+  const rising = floors.every(([from, to]) => to === from + 1);
+  ok(floors.length > 0 && rising, `층이 한 칸씩 상승 [${floors.map((f) => f.join('→')).join(', ')}]`);
+  ok(result && result.floor >= 2, `챔피언 층 ${result ? result.floor : '-'}층 기록됨`);
+  ok(result && typeof result.scene === 'string', `층 환경 '${result ? result.scene : '-'}' 전달됨`);
+
+  // 5분 슬롯이 하드 제약이다. 대기실 2초를 뺀 순수 게임 시간을 본다.
+  const gameSec = (obs.elapsedMs - 2000) / 1000;
+  ok(gameSec < 180, `한 판 ${gameSec.toFixed(1)}초 — 3분 예산 이내`);
+
+  close(); solo.close(); obs.close();
+}
+
 // ───────────────────────────────────────────── 실행
 
 (async () => {
@@ -369,6 +435,7 @@ function get(path) {
     await scenarioB();
     await scenarioC();
     await scenarioE();
+    await scenarioF();
   } catch (err) {
     fail += 1;
     console.log(`\n  ✗ 예외 발생: ${err.message}`);
