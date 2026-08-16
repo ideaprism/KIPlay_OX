@@ -179,12 +179,20 @@
 
       this._onResize = () => this.resize();
       window.addEventListener('resize', this._onResize);
+
+      // 숨겨진 화면 안에서 만들어지면 크기가 0이라 1x1로 잡힌다.
+      // 화면이 표시되는 순간을 잡아 다시 재야 한다.
+      if ('ResizeObserver' in window) {
+        this._ro = new ResizeObserver(() => this.resize());
+        this._ro.observe(canvas);
+      }
       this.resize();
     }
 
     destroy() {
       this.stop();
       window.removeEventListener('resize', this._onResize);
+      if (this._ro) { this._ro.disconnect(); this._ro = null; }
     }
 
     resize() {
@@ -332,6 +340,7 @@
       const t = now - this.t0;
       const W = this.w;
       const H = this.h;
+      if (W < 8 || H < 8) return; // 아직 화면에 붙지 않았다
 
       c.save();
       c.scale(this.dpr, this.dpr);
