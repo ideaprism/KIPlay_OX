@@ -314,16 +314,15 @@ async function scenarioE() {
   ok(health.players === 41, `참가 인원 41명 (본인 1 + 봇 40) — 실제 ${health.players}`);
   ok(health.phase === 'lobby', '대기실 진입');
 
-  // 41명은 100명 미만이라 진행 중 집계가 가려져야 한다
   let sawDemoFlag = false;
-  let sawHidden = false;
+  let sawMoving = false;   // 방향까지 담긴 마스크가 왔는가 (사람들이 O/X로 달려간다)
   let sawDeciding = false;
   let leakedTally = false;
   let peakAlive = 0;
   const closeTally = sse('/api/spectate', (event, s) => {
     if (event === 'state' && s.demo) sawDemoFlag = true;
     if (event === 'tally') {
-      if (s.tallyVisible === false && s.o === null) sawHidden = true;
+      if (s.choices && /[OX]/.test(s.choices)) sawMoving = true;
       if (s.tallyVisible === false && (s.o !== null || s.x !== null)) leakedTally = true;
       if (s.decided && s.decided.includes('1')) sawDeciding = true;
       peakAlive = Math.max(peakAlive, s.alive);
@@ -333,9 +332,9 @@ async function scenarioE() {
   const result = await waitForResult(obs);
 
   ok(sawDemoFlag, '상태에 체험 모드 표시가 실림 (화면에 안내 띠가 뜬다)');
-  ok(sawHidden, '100명 미만이라 진행 중 O/X 집계가 가려짐');
+  ok(sawMoving, '진행 중 선택 방향이 전달됨 (사람들이 O/X로 달려간다)');
   ok(!leakedTally, '가려진 구간에서 집계가 새지 않음');
-  ok(sawDeciding, '방향은 감춰도 "선택함" 표시는 전달됨');
+  ok(sawDeciding || sawMoving, '선택 상태가 매 초 전달됨');
 
   const firstReveal = obs.seen.reveals[0];
   const split = firstReveal && firstReveal.choices &&
@@ -383,8 +382,12 @@ async function scenarioF() {
   solo.suddenValue = 1000;
   await sleep(250);
 
-  let visibleAbove = false;   // 100명 이상일 때 집계가 보였는가
-  let hiddenBelow = false;    // 100명 미만으로 떨어지자 가려졌는가
+  // 가리기 임계값은 서버가 정한다. 테스트가 상수를 따로 들고 있으면 어긋난다.
+  const cfg = await get('/api/health');
+  const TH = cfg.tallyFrom;
+
+  let visibleAbove = false;   // 임계값 이상일 때 집계가 보였는가
+  let hiddenBelow = false;    // 임계값 밑으로 떨어지자 가려졌는가
   let leak = false;
   let crowdSeen = null;
   const floors = [];
@@ -395,8 +398,8 @@ async function scenarioF() {
       if (s.phase === 'reveal' && s.reveal) floors.push([s.reveal.fromFloor, s.reveal.toFloor]);
     }
     if (event === 'tally') {
-      if (s.alive >= 100 && s.tallyVisible && s.o !== null) visibleAbove = true;
-      if (s.alive < 100 && s.tallyVisible === false) hiddenBelow = true;
+      if (s.alive >= TH && s.tallyVisible && s.o !== null) visibleAbove = true;
+      if (s.alive < TH && s.tallyVisible === false) hiddenBelow = true;
       if (s.tallyVisible === false && s.o !== null) leak = true;
     }
   });
@@ -405,9 +408,9 @@ async function scenarioF() {
   // 층 상승 연출로 정답 공개가 4~6초로 늘어나 한 판이 90초를 넘길 수 있다
   const result = await waitForResult(obs, 180000);
 
-  ok(visibleAbove, '100명 이상 구간에서는 집계가 보임');
-  ok(hiddenBelow, '100명 미만으로 떨어지면 집계가 가려짐');
+  ok(visibleAbove, `${TH}명 이상 구간에서는 집계가 보임`);
   ok(!leak, '가려진 뒤로는 집계가 한 번도 새지 않음');
+  void hiddenBelow; // 임계값 아래 구간은 시나리오 G에서 확정적으로 검증한다
 
   ok(crowdSeen && crowdSeen.n === 151, `군중 배열 ${crowdSeen ? crowdSeen.n : '-'}명 (본인 1 + 봇 150)`);
   ok(crowdSeen && crowdSeen.div.length === crowdSeen.n, '본부 마스크 길이가 인원과 일치');
@@ -425,6 +428,51 @@ async function scenarioF() {
   close(); solo.close(); obs.close();
 }
 
+async function scenarioG() {
+  console.log('\n[G] 임계값 아래 — 처음부터 소수 인원');
+  await post('/api/admin/reset', { key: KEY });
+  await sleep(150);
+
+  const cfg = await get('/api/health');
+  const TH = cfg.tallyFrom;
+  const bots = Math.max(4, TH - 12); // 시작부터 임계값 아래가 되도록 확정적으로 잡는다
+
+  const obs = observe();
+  const solo = await join('15029', () => (Math.random() < 0.5 ? 'O' : 'X'));
+  solo.suddenValue = 1000;
+  await sleep(250);
+
+  let sawHidden = false;
+  let leaked = false;
+  let sawDecided = false;
+  let sawDirection = false;
+  let maxAlive = 0;
+
+  const close = sse('/api/spectate', (event, s) => {
+    if (event !== 'tally') return;
+    maxAlive = Math.max(maxAlive, s.alive);
+    if (s.tallyVisible === false && s.o === null) sawHidden = true;
+    if (s.tallyVisible === false && (s.o !== null || s.x !== null)) leaked = true;
+    if (s.decided && s.decided.includes('1')) sawDecided = true;
+    if (s.choices) sawDirection = true;
+  });
+
+  await post('/api/demo/start', { token: solo.token, bots, lobbySec: 2 });
+  await waitForResult(obs);
+
+  ok(maxAlive < TH, `전 구간 ${TH}명 미만 유지 (최대 ${maxAlive}명)`);
+  ok(sawHidden, `${TH}명 미만이라 진행 중 집계가 가려짐`);
+  ok(!leaked, '가려진 구간에서 집계가 새지 않음');
+  ok(!sawDirection, '방향 마스크가 전혀 전달되지 않음 (개발자도구로도 볼 수 없다)');
+  ok(sawDecided, '방향은 감춰도 "선택함" 표시는 전달됨');
+
+  const firstReveal = obs.seen.reveals[0];
+  ok(firstReveal && firstReveal.choices && /[OX]/.test(firstReveal.choices),
+    '정답 공개 순간에는 전원의 선택이 드러남');
+
+  close(); solo.close(); obs.close();
+}
+
 // ───────────────────────────────────────────── 실행
 
 (async () => {
@@ -436,6 +484,7 @@ async function scenarioF() {
     await scenarioC();
     await scenarioE();
     await scenarioF();
+    await scenarioG();
   } catch (err) {
     fail += 1;
     console.log(`\n  ✗ 예외 발생: ${err.message}`);

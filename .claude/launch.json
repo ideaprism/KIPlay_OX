@@ -5,7 +5,8 @@
       "name": "1255",
       "runtimeExecutable": "node",
       "runtimeArgs": ["server.js"],
-      "port": 12055
+      "port": 12055,
+      "autoPort": false
     }
   ]
 }

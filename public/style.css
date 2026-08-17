@@ -432,7 +432,10 @@ body[data-demo="1"] .screen {
 
 /* ─────────────────────────────────────────────── 문항 진행 */
 
-#s-question, #s-watch, #s-sudden { justify-content: space-between; gap: var(--sp-2); }
+/* 위에서 아래로: 문항 → 집계 → O·X 버튼 → 무대.
+   무대가 남는 공간을 전부 가져가므로 space-between이 아니라 자연 적층이다. */
+#s-question, #s-watch, #s-sudden { gap: 14px; }
+#s-sudden { justify-content: space-between; }
 
 .topbar {
   display: flex;
@@ -494,10 +497,11 @@ body[data-demo="1"] .screen {
 
 /* 군중 — 폰에서는 O/X 버튼이 여전히 최우선이므로 상단에 작게 둔다.
    진짜 쇼는 전광판이 담당한다. */
+/* 화면 맨 아래가 무대다. 남는 세로를 전부 가져간다.
+   위 O·X 발판과 아래 군중이 같이 들어가야 하므로 최소 높이를 지킨다. */
 .crowd-box {
-  flex: 0 0 auto;
-  /* 위 O·X 발판과 아래 군중이 같이 들어가야 하므로 세로 여유가 필요하다 */
-  height: clamp(160px, 30vh, 320px);
+  flex: 1 1 auto;
+  min-height: 150px;
   border-radius: 10px;
   overflow: hidden;
   background: var(--surface);
@@ -507,11 +511,10 @@ body[data-demo="1"] .screen {
 .crowd-box canvas { display: block; width: 100%; height: 100%; }
 
 .qbody {
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  gap: var(--sp-2);
+  gap: 10px;
   min-height: 0;
 }
 
@@ -610,7 +613,7 @@ body[data-demo="1"] .screen {
   grid-template-columns: 1fr 1fr;
   gap: 12px;
   flex: 0 0 auto;
-  height: min(40vh, 260px);
+  height: clamp(140px, 26vh, 220px);
 }
 
 .choice {
@@ -778,12 +781,11 @@ body[data-demo="1"] .screen {
 }
 
 .watch-body {
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
-  justify-content: center;
   align-items: center;
-  gap: var(--sp-2);
+  gap: 6px;
   text-align: center;
   min-height: 0;
 }

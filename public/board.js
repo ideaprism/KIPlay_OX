@@ -20,6 +20,7 @@ let audioReady = false;
 let lastPhase = null;
 let lastQIndex = -1;
 let countdownAt = null;
+let sceneLocked = false;
 
 const now = () => Date.now() + clockOffset;
 const pad2 = (n) => String(n).padStart(2, '0');
@@ -39,6 +40,17 @@ const SCENE_KO = {
 function initStage() {
   stage = new CrowdStage($('stage-canvas'), { zones: true });
   stage.start();
+
+  // 층 환경 확인용 픽스처. 서버 없이 각 층을 바로 볼 수 있다.
+  //   /board.html?scene=datacenter   lobby | office | review | archive | datacenter | rooftop
+  const forced = new URLSearchParams(location.search).get('scene');
+  if (forced && CROWD_SCENES[forced]) {
+    stage.scene = forced;
+    stage.sceneT = 1;
+    stage.sceneLocked = true;   // 서버 상태가 덮어쓰지 못하게 잠근다
+    stage.floor = { lobby: 1, office: 2, review: 3, archive: 4, datacenter: 5, rooftop: 6 }[forced] || 1;
+    sceneLocked = true;
+  }
 }
 
 function drawTower() {
@@ -153,8 +165,13 @@ function render(s) {
   $('b-joined').textContent = s.joined;
   $('b-q').textContent = s.qIndex >= 0 ? `${pad2(s.qIndex + 1)} / ${pad2(s.qTotal)}` : '— / —';
   $('b-alive').textContent = s.alive;
-  $('t-floor').textContent = `${s.floor || 1}F`;
-  $('t-scene').textContent = SCENE_KO[s.scene] || '';
+  if (!sceneLocked) {
+    $('t-floor').textContent = `${s.floor || 1}F`;
+    $('t-scene').textContent = SCENE_KO[s.scene] || '';
+  } else {
+    $('t-floor').textContent = `${stage.floor}F`;
+    $('t-scene').textContent = SCENE_KO[stage.scene] || '';
+  }
   drawTower();
 
   if (s.vip) {
@@ -268,8 +285,7 @@ function render(s) {
       }
 
       // 승자는 층과 무관하게 옥상으로 올라가 도시를 내려다본다
-      stage.scene = 'rooftop';
-      stage.riseT = 0;
+      if (!sceneLocked) { stage.scene = 'rooftop'; stage.riseT = 0; }
 
       const list = $('b-center-list');
       list.hidden = false;

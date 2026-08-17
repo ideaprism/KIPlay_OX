@@ -33,10 +33,17 @@ const CONFIG = {
   newbieYears: 2,     // 입사 N년 미만에게 부활권
   heartbeatMs: 15000, // SSE keep-alive
 
-  // 생존자가 이 수 미만이면 실시간 O/X 집계를 보내지 않는다.
-  // 초반은 군중을 보고 눈치를 보지만 후반은 혼자 판단해야 한다.
-  // 반드시 서버에서 잘라야 한다. 클라이언트에서만 숨기면 개발자도구로 그대로 보인다.
-  tallyVisibleFrom: 100,
+  /**
+   * 생존자가 이 수 미만이면 실시간 O/X 집계를 보내지 않는다.
+   * 초반은 군중을 보고 눈치를 보지만 후반은 혼자 판단해야 한다.
+   * 반드시 서버에서 잘라야 한다. 클라이언트에서만 숨기면 개발자도구로 그대로 보인다.
+   *
+   * 처음엔 100으로 뒀는데 그러면 1~2문항 만에 100명 밑으로 떨어져
+   * 사람들이 O/X로 달려가는 간판 연출이 초반에만 보이고 나머지 내내 정지 화면이 된다.
+   * 30이면 마지막 한두 문항만 깜깜이가 되어 원래 의도(외로운 결승)는 살면서
+   * 군중이 갈라지는 장면은 게임 내내 볼 수 있다.
+   */
+  tallyVisibleFrom: Number(process.env.TALLY_FROM) || 30,
 };
 
 /**
@@ -887,6 +894,8 @@ async function handler(req, res) {
       connected,
       spectators: game.spectators.size,
       alive: alivePlayers().length,
+      floor: game.floor,
+      tallyFrom: CONFIG.tallyVisibleFrom,
       uptimeSec: Math.round(process.uptime()),
       rssMB: +(m.rss / 1048576).toFixed(1),
       heapMB: +(m.heapUsed / 1048576).toFixed(1),
@@ -937,6 +946,22 @@ async function handler(req, res) {
     return sendJson(res, 200, {
       token,
       user: { ...emp, isNew: player.isNew, revives: player.revives, spectatorOnly: !player.alive },
+    });
+  }
+
+  // ---- 세션 확인
+  //
+  // 서버가 재시작되면 브라우저에 남아 있는 토큰은 전부 무효가 된다.
+  // 이걸 알려주지 않으면 화면은 멀쩡한데 모든 동작이 조용히 실패한다.
+  if (p === '/api/session') {
+    const player = game.players.get(body.token);
+    if (!player) return sendJson(res, 401, { error: 'invalid token' });
+    return sendJson(res, 200, {
+      ok: true,
+      user: {
+        empId: player.empId, name: player.name, dept: player.dept, div: player.div,
+        years: player.years, isNew: player.isNew, vip: player.vip, revives: player.revives,
+      },
     });
   }
 

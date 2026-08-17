@@ -349,13 +349,27 @@ function renderResult(s, me) {
 
 // ═══════════════════════════════════════════════ 통신
 
+/** 세션이 죽었으면 토큰을 버리고 로그인으로 돌려보낸다. */
+function dropSession(reason) {
+  if (state.es) { state.es.close(); state.es = null; }
+  state.token = null;
+  sessionStorage.removeItem('t1255');
+  $('login-error').textContent = reason || '세션이 만료되었습니다. 다시 입장해 주세요.';
+  setScreen('login');
+}
+
 async function post(path, payload) {
   const res = await fetch(path, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
-  return { ok: res.ok, data: await res.json().catch(() => ({})) };
+  const data = await res.json().catch(() => ({}));
+  // 서버 재시작 등으로 토큰이 무효가 되면 조용히 실패하지 않고 즉시 알린다
+  if (res.status === 401 && path !== '/api/login') {
+    dropSession('서버가 다시 시작되었습니다. 사번을 다시 입력해 주세요.');
+  }
+  return { ok: res.ok, data };
 }
 
 function connect() {
@@ -585,7 +599,14 @@ document.addEventListener('keydown', (e) => {
 
 // ═══════════════════════════════════════════════ 부팅
 
-if (state.token) connect();
+// 저장된 토큰이 아직 살아 있는지 먼저 확인한다.
+// 죽은 토큰으로 스트림을 열면 계속 재접속만 시도하며 화면이 멈춘 것처럼 보인다.
+(async () => {
+  if (!state.token) return;
+  const { ok } = await post('/api/session', { token: state.token });
+  if (ok) connect();
+})();
+
 startTimerLoop();
 
 // ── 화면별 픽스처. 서버 없이 각 화면을 바로 확인할 수 있다.

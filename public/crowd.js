@@ -199,14 +199,17 @@
       this.alive = s.alive ?? this.alive;
       this.named = s.named || null;
 
-      if (s.scene && s.scene !== this.scene) {
-        this.prevScene = this.scene;
-        this.scene = s.scene;
-        this.sceneT = 0;
-      }
-      if (typeof s.floor === 'number' && s.floor !== this.floor) {
-        this.floor = s.floor;
-        this.riseT = 0;
+      // ?scene= 픽스처로 층을 고정한 상태면 서버 값으로 덮어쓰지 않는다
+      if (!this.sceneLocked) {
+        if (s.scene && s.scene !== this.scene) {
+          this.prevScene = this.scene;
+          this.scene = s.scene;
+          this.sceneT = 0;
+        }
+        if (typeof s.floor === 'number' && s.floor !== this.floor) {
+          this.floor = s.floor;
+          this.riseT = 0;
+        }
       }
       if (s.aliveMask) this.applyAlive(s.aliveMask);
 
