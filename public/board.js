@@ -241,6 +241,8 @@ function render(s) {
   switch (s.phase) {
     case 'idle':
       showCenter(true);
+      $('b-center').classList.remove('on-rooftop');
+      stage.clearChampion();
       $('b-center-label').textContent = '대기 중';
       $('b-center-big').textContent = '12:55';
       $('b-center-big').className = 'huge mono';
@@ -252,6 +254,8 @@ function render(s) {
 
     case 'lobby':
       showCenter(true);
+      $('b-center').classList.remove('on-rooftop');
+      stage.clearChampion();
       $('b-center-label').textContent = '시작까지';
       $('b-center-big').className = 'huge mono';
       $('b-center-big').textContent = fmtClock(s.phaseEndsAt - now());
@@ -319,8 +323,11 @@ function render(s) {
         $('b-center-sub').textContent = '아무도 끝까지 살아남지 못했습니다.';
       }
 
-      // 승자는 층과 무관하게 옥상으로 올라가 도시를 내려다본다
-      if (!sceneLocked) { stage.scene = 'rooftop'; stage.riseT = 0; }
+      // 승자는 층과 무관하게 옥상으로 올라가 도시를 내려다본다.
+      // 오버레이가 화면을 덮으면 그 장면이 안 보이므로 위쪽만 어둡게 한다.
+      const hasChamp = !!(r && r.champion);
+      $('b-center').classList.toggle('on-rooftop', hasChamp);
+      if (hasChamp) stage.setChampion(r.champion.ci);
 
       const list = $('b-center-list');
       list.hidden = false;

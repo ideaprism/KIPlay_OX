@@ -32,12 +32,14 @@ const state = {
 // 폰에서는 O/X 버튼이 최우선이라 군중은 상단에 작게 둔다. compact 모드로 카메라를
 // 조금 더 당겨 인원이 많아도 사람이 보이게 한다. 진짜 쇼는 전광판이 담당한다.
 
-const stages = { question: null, watch: null };
+const stages = { question: null, watch: null, result: null };
 
 function initStages() {
   if (stages.question) return;
   stages.question = new CrowdStage($('crowd-canvas'), { compact: true, zones: true });
   stages.watch = new CrowdStage($('watch-canvas'), { compact: true, zones: true });
+  // 결과 화면의 옥상. O·X 발판은 필요 없다.
+  stages.result = new CrowdStage($('result-canvas'), { compact: true, zones: false });
   for (const s of Object.values(stages)) s.start();
 }
 
@@ -216,6 +218,7 @@ function render(s) {
       setScreen('lobby');
       $('lobby-countdown').textContent = fmtClock(s.phaseEndsAt - now());
       lastQIndex = -1;
+      eachStage((st) => st.clearChampion());
       break;
 
     case 'question': {
@@ -296,7 +299,13 @@ function render(s) {
     }
 
     case 'result':
-      if (phaseChanged) renderResult(s, me);
+      if (phaseChanged) {
+        renderResult(s, me);
+        // 챔피언은 몇 층에서 이겼든 마지막은 옥상이다
+        if (s.result && s.result.champion && s.result.champion.ci !== null) {
+          stages.result.setChampion(s.result.champion.ci);
+        }
+      }
       setScreen('result');
       break;
   }
@@ -648,10 +657,13 @@ document.addEventListener('keydown', (e) => {
 
 // ═══════════════════════════════════════════════ 부팅
 
+const fixtureName = new URLSearchParams(location.search).get('screen');
+
 // 저장된 토큰이 아직 살아 있는지 먼저 확인한다.
 // 죽은 토큰으로 스트림을 열면 계속 재접속만 시도하며 화면이 멈춘 것처럼 보인다.
+// 픽스처로 화면만 보는 중이면 건드리지 않는다.
 (async () => {
-  if (!state.token) return;
+  if (!state.token || fixtureName) return;
   const { ok } = await post('/api/session', { token: state.token });
   if (ok) connect();
 })();
@@ -660,7 +672,7 @@ startTimerLoop();
 
 // ── 화면별 픽스처. 서버 없이 각 화면을 바로 확인할 수 있다.
 //    예) /?screen=reveal   /?screen=revive   /?screen=champion
-const fixture = new URLSearchParams(location.search).get('screen');
+const fixture = fixtureName;
 if (fixture) {
   const demo = {
     phase: 'idle', serverNow: Date.now(), phaseEndsAt: 0, joined: 312, alive: 37,
@@ -680,8 +692,18 @@ if (fixture) {
                  eliminated: 'question', suddendeath: 'sudden', champion: 'result' }[fixture] || 'lobby';
   if (fixture === 'eliminated') demo.me.alive = false;
   if (fixture === 'champion') {
+    demo.crowd = {
+      round: 1, n: 12,
+      divisions: [
+        { id: 'mgmt', short: '경영', color: '#5B84F0' }, { id: 'util', short: '활용', color: '#2FC4D9' },
+        { id: 'sys', short: '시스템', color: '#A06CE8' }, { id: 'ai', short: '지능', color: '#BFD645' },
+        { id: 'plat', short: '분석', color: '#EE6BA8' }, { id: 'etc', short: '기타', color: '#8B93B0' },
+      ],
+      div: '012345012345', flags: 'v...n....n..',
+    };
     demo.result = {
-      champion: { name: '조새싹', dept: '정보서비스실', isNew: true, survived: 5 },
+      floor: 6, scene: 'rooftop',
+      champion: { name: '조새싹', dept: '정보서비스실', div: 'sys', ci: 4, isNew: true, survived: 5 },
       ranking: [
         { rank: 1, name: '조새싹', dept: '정보서비스실', survived: 5, points: 105, isNew: true, vip: false },
         { rank: 2, name: '김원장', dept: '원장실', survived: 4, points: 45, isNew: false, vip: true },

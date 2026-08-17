@@ -179,6 +179,19 @@ body { overflow: hidden; }
   background: linear-gradient(180deg, rgba(14,16,32,.82), rgba(14,16,32,.94));
 }
 
+/* 우승 장면에서는 화면을 덮으면 안 된다. 옥상과 챔피언이 그 아래 있기 때문이다.
+   글자는 위쪽에 모으고 배경은 위에서 아래로 사라지게 한다. */
+.bcenter.on-rooftop {
+  justify-content: flex-start;
+  gap: clamp(6px, 1vh, 14px);
+  padding-top: clamp(18px, 3vh, 44px);
+  background: linear-gradient(180deg, rgba(14,16,32,.92) 0%, rgba(14,16,32,.72) 32%, rgba(14,16,32,.28) 52%, rgba(14,16,32,0) 68%);
+  pointer-events: none;
+}
+
+.bcenter.on-rooftop .champ-name { text-shadow: 0 4px 28px rgba(0,0,0,.8); }
+.bcenter.on-rooftop .blist { display: none; }   /* 순위표는 옥상을 가린다 */
+
 .bcenter .huge {
   font-family: var(--mono); font-variant-numeric: tabular-nums;
   font-size: clamp(76px, 15vw, 260px); font-weight: 700; line-height: 0.86;

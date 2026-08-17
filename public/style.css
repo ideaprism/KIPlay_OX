@@ -510,6 +510,27 @@ body[data-demo="1"] .screen {
 
 .crowd-box canvas { display: block; width: 100%; height: 100%; }
 
+/* 결과 화면 상단의 옥상. 챔피언이 도시를 내려다보는 그림이다. */
+.rooftop-box {
+  flex: 0 0 auto;
+  height: clamp(180px, 32vh, 300px);
+  margin-bottom: -8px;
+}
+
+/* 배지 범례 — 왕관과 새싹이 무슨 뜻인지 알려준다 */
+.badge-legend {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  flex-wrap: wrap;
+  font-size: 12.5px;
+  color: var(--ink-3);
+  flex: 0 0 auto;
+}
+
+.badge-legend span { display: flex; align-items: center; gap: 5px; }
+.badge-legend b { color: var(--ink-2); font-weight: 600; }
+
 .qbody {
   flex: 0 0 auto;
   display: flex;

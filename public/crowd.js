@@ -140,6 +140,7 @@
       this.myIndex = null;
 
       this.revealSide = null;
+      this.championIndex = null;   // 우승 장면 — 이 사람만 옥상에 크게 남는다
       this.riseT = 1;
       this.t0 = performance.now();
       this.raf = null;
@@ -223,6 +224,22 @@
 
     setMyIndex(i) { this.myIndex = i; }
 
+    /**
+     * 우승 장면. 챔피언 혼자 옥상에 서서 도시를 내려다본다.
+     * 몇 층에서 이겼든 마지막은 옥상이다.
+     */
+    setChampion(ci) {
+      this.championIndex = typeof ci === 'number' ? ci : null;
+      if (this.championIndex !== null && !this.sceneLocked) {
+        this.prevScene = this.scene;
+        this.scene = 'rooftop';
+        this.sceneT = 0;
+      }
+      this.layout();
+    }
+
+    clearChampion() { this.championIndex = null; }
+
     applyAlive(mask) {
       for (let i = 0; i < this.people.length && i < mask.length; i += 1) {
         this.people[i].alive = mask[i] === '1';
@@ -272,6 +289,21 @@
       // 폰은 화면이 작으니 사람을 더 크게 잡고 그만큼 더 많이 화면 밖으로 넘긴다
       const r = radiusFor(this.alive || this.n, H, this.compact ? 0.032 : 0.020);
       const gap = r * 2.7;
+
+      // 우승 장면 — 챔피언만 무대 중앙에 서고 나머지는 아래로 물러난다
+      if (this.championIndex !== null) {
+        for (const p of this.people) {
+          if (p.i === this.championIndex) {
+            p.tx = W / 2;
+            p.ty = H * 0.72;
+          } else {
+            p.ty = H * 1.4;
+            p.alive = false;
+          }
+        }
+        this.r = r;
+        return;
+      }
 
       const zones = { O: [], X: [], home: [] };
       const gone = [];
@@ -399,15 +431,36 @@
 
     drawPeople(c, t) {
       const tier = tierFor(this.alive || this.n);
-      const r = this.r || radiusFor(this.alive || this.n, this.h, this.compact ? 0.032 : 0.020);
+      const baseR = this.r || radiusFor(this.alive || this.n, this.h, this.compact ? 0.032 : 0.020);
       const namedMap = this.named ? new Map(this.named.map((x) => [x.i, x])) : null;
 
+      const champ = this.championIndex;
+
       for (const p of this.people) {
+        if (champ !== null && p.i !== champ) continue;
         if (p.fade < 0.03) continue;
         if (p.y > this.h * 1.15 && !p.alive) continue;
 
+        const isChamp = p.i === champ;
+        const r = isChamp ? Math.max(baseR, this.h * 0.105) : baseR;
         const col = (this.divisions[p.div] && this.divisions[p.div].color) || '#8B93B0';
-        c.globalAlpha = p.fade;
+        c.globalAlpha = isChamp ? 1 : p.fade;
+
+        // 우승자 발밑의 빛과 그림자 — 혼자 서 있다는 게 읽혀야 한다
+        if (isChamp) {
+          const g = c.createRadialGradient(p.x, p.y, r * 0.2, p.x, p.y, r * 3.4);
+          g.addColorStop(0, 'rgba(255,180,60,.20)');
+          g.addColorStop(1, 'rgba(255,180,60,0)');
+          c.fillStyle = g;
+          c.beginPath();
+          c.arc(p.x, p.y, r * 3.4, 0, 6.283);
+          c.fill();
+
+          c.fillStyle = 'rgba(0,0,0,.35)';
+          c.beginPath();
+          c.ellipse(p.x, p.y + r * 0.22, r * 1.15, r * 0.28, 0, 0, 6.283);
+          c.fill();
+        }
 
         // 달리는 중이면 살짝 위아래로 튄다
         const running = Math.abs(p.y - p.ty) > r * 0.6;
@@ -442,9 +495,11 @@
           c.fill();
         }
 
-        if (p.alive && tier >= 2) {
-          if (p.flag === 'v') { c.fillStyle = '#FFB43C'; c.fillRect(p.x - r * 0.5, p.y - r * 3.1 - bob, r, r * 0.42); }
-          else if (p.flag === 'n') { c.fillStyle = '#4FC08D'; c.beginPath(); c.arc(p.x + r * 0.88, p.y - r * 2.2 - bob, r * 0.25, 0, 6.283); c.fill(); }
+        // 배지는 알아볼 수 있어야 뜻이 있다. 점만 찍으면 그게 뭔지 아무도 모른다.
+        // 작을 때는 아예 안 그린다 — 뭉개진 얼룩은 정보가 아니라 노이즈다.
+        if (p.alive && r >= 6) {
+          if (p.flag === 'v') this.drawCrown(c, p.x, p.y - r * 2.55 - bob, r);
+          else if (p.flag === 'n') this.drawSprout(c, p.x + r * 1.05, p.y - r * 2.3 - bob, r);
         }
 
         if (this.myIndex === p.i && p.alive) {
@@ -473,6 +528,40 @@
         }
       }
       c.globalAlpha = 1;
+    }
+
+    /** VIP 왕관 */
+    drawCrown(c, x, y, r) {
+      c.fillStyle = '#FFB43C';
+      c.beginPath();
+      c.moveTo(x - r * 0.72, y + r * 0.34);
+      c.lineTo(x - r * 0.72, y - r * 0.34);
+      c.lineTo(x - r * 0.34, y + r * 0.06);
+      c.lineTo(x, y - r * 0.5);
+      c.lineTo(x + r * 0.34, y + r * 0.06);
+      c.lineTo(x + r * 0.72, y - r * 0.34);
+      c.lineTo(x + r * 0.72, y + r * 0.34);
+      c.closePath();
+      c.fill();
+    }
+
+    /** 신입 새싹 — 줄기와 잎 두 장 */
+    drawSprout(c, x, y, r) {
+      c.strokeStyle = '#4FC08D';
+      c.lineWidth = Math.max(1, r * 0.15);
+      c.lineCap = 'round';
+      c.beginPath();
+      c.moveTo(x, y + r * 0.5);
+      c.lineTo(x, y - r * 0.1);
+      c.stroke();
+
+      c.fillStyle = '#4FC08D';
+      c.beginPath();
+      c.ellipse(x - r * 0.3, y + r * 0.02, r * 0.3, r * 0.15, -0.7, 0, 6.283);
+      c.fill();
+      c.beginPath();
+      c.ellipse(x + r * 0.3, y - r * 0.12, r * 0.3, r * 0.15, 0.7, 0, 6.283);
+      c.fill();
     }
 
     drawFloorTag(c, W, H, sc) {
