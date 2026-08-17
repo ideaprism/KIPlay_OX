@@ -36,8 +36,8 @@ const stages = { question: null, watch: null };
 
 function initStages() {
   if (stages.question) return;
-  stages.question = new CrowdStage($('crowd-canvas'), { compact: true, labels: false });
-  stages.watch = new CrowdStage($('watch-canvas'), { compact: true, labels: false });
+  stages.question = new CrowdStage($('crowd-canvas'), { compact: true, zones: true });
+  stages.watch = new CrowdStage($('watch-canvas'), { compact: true, zones: true });
   for (const s of Object.values(stages)) s.start();
 }
 

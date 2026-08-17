@@ -496,7 +496,8 @@ body[data-demo="1"] .screen {
    진짜 쇼는 전광판이 담당한다. */
 .crowd-box {
   flex: 0 0 auto;
-  height: clamp(120px, 22vh, 200px);
+  /* 위 O·X 발판과 아래 군중이 같이 들어가야 하므로 세로 여유가 필요하다 */
+  height: clamp(160px, 30vh, 320px);
   border-radius: 10px;
   overflow: hidden;
   background: var(--surface);

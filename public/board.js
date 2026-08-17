@@ -37,7 +37,7 @@ const SCENE_KO = {
 // ─────────────────────────────────────────── 무대
 
 function initStage() {
-  stage = new CrowdStage($('stage-canvas'), { labels: true });
+  stage = new CrowdStage($('stage-canvas'), { zones: true });
   stage.start();
 }
 
