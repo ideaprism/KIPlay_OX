@@ -43,6 +43,44 @@ function initStages() {
 
 const eachStage = (fn) => { for (const s of Object.values(stages)) if (s) fn(s); };
 
+// ═══════════════════════════════════════════════ 중계
+
+const commentary = new Commentary();
+let captionTimer = null;
+const captionQueue = [];
+
+function showCaption(line) {
+  const el = $('caption');
+  el.textContent = line.text;
+  el.dataset.tone = line.tone || '';
+  clearTimeout(captionTimer);
+  captionTimer = setTimeout(() => { el.textContent = ''; el.dataset.tone = ''; }, 7000);
+  Sfx.say(line.say || line.text);
+}
+
+/** 여러 줄이 한꺼번에 나오면 읽히지 않는다. 간격을 두고 하나씩 흘린다. */
+function runCommentary(s) {
+  const lines = commentary.update(s);
+  if (!lines.length) return;
+  for (const line of lines) captionQueue.push(line);
+  if (captionQueue.length === lines.length) drainCaptions();
+}
+
+function drainCaptions() {
+  const line = captionQueue.shift();
+  if (!line) return;
+  showCaption(line);
+  if (captionQueue.length) setTimeout(drainCaptions, 2800);
+}
+
+/** 선택 가리기 안내. 규칙이 바뀌었다는 걸 화면에 계속 남긴다. */
+function renderBlindNote(s) {
+  const el = $('blind-note');
+  const hidden = s.tallyVisible === false && s.phase !== 'idle' && s.phase !== 'lobby';
+  el.hidden = !hidden;
+  if (hidden) el.textContent = `${s.tallyFrom || 30}명 이하부터는 다른 사람이 무엇을 골랐는지 보이지 않습니다`;
+}
+
 // ═══════════════════════════════════════════════ 유틸
 
 const now = () => Date.now() + state.clockOffset;
@@ -98,7 +136,7 @@ function startTimerLoop() {
     const remain = s.phaseEndsAt - now();
 
     if (s.phase === 'question') {
-      const ratio = Math.max(0, Math.min(1, remain / 7000));
+      const ratio = Math.max(0, Math.min(1, remain / (s.questionMs || 10000)));
       $('q-timer-fill').style.transform = `scaleX(${ratio})`;
       $('q-timer').classList.toggle('urgent', remain <= 3000);
 
@@ -108,7 +146,7 @@ function startTimerLoop() {
         Sfx.tick();
       }
     } else if (s.phase === 'sudden') {
-      const ratio = Math.max(0, Math.min(1, remain / 15000));
+      const ratio = Math.max(0, Math.min(1, remain / (s.suddenMs || 20000)));
       $('sd-timer-fill').style.transform = `scaleX(${ratio})`;
       $('sd-timer').classList.toggle('urgent', remain <= 4000);
     } else if (s.phase === 'lobby') {
@@ -161,6 +199,9 @@ function render(s) {
   body.dataset.demo = s.demo ? '1' : '0';
   $('lobby-demo').hidden = s.phase !== 'idle';   // 진행 중에는 새 체험을 열지 않는다
   $('rs-replay').hidden = !s.demo;
+
+  renderBlindNote(s);
+  runCommentary(s);
 
   const phaseChanged = s.phase !== lastPhase;
   lastPhase = s.phase;
@@ -456,7 +497,7 @@ async function submitAnswer(qIndex, answer) {
       return;
     }
 
-    const rt = Math.max(0, 7000 - (s.phaseEndsAt - now()));
+    const rt = Math.max(0, (s.questionMs || 10000) - (s.phaseEndsAt - now()));
     try {
       const { ok, data } = await post('/api/answer', { token: state.token, qIndex, answer, rt });
       if (ok) { setSendState('ok', `${answer} 전송됨`); return; }
@@ -512,7 +553,7 @@ $('sudden-form').addEventListener('submit', (e) => {
   $('sd-submit').disabled = true;
   $('sd-submit').textContent = '제출됨';
   Sfx.select();
-  const rt = Math.max(0, 15000 - (s.phaseEndsAt - now()));
+  const rt = Math.max(0, (s.suddenMs || 20000) - (s.phaseEndsAt - now()));
   post('/api/sudden', { token: state.token, value: v, rt });
 });
 
@@ -589,6 +630,14 @@ async function startDemo() {
 
 $('demo-start').addEventListener('click', startDemo);
 $('rs-replay').addEventListener('click', startDemo);
+
+$('narration-toggle').addEventListener('click', (e) => {
+  Sfx.narrationOn = !Sfx.narrationOn;
+  if (!Sfx.narrationOn) Sfx.silence();
+  else Sfx.say('나레이션을 켰습니다.');
+  e.currentTarget.setAttribute('aria-pressed', String(Sfx.narrationOn));
+  e.currentTarget.textContent = Sfx.narrationOn ? '나레이션 켜짐' : '나레이션 꺼짐';
+});
 
 // 키보드 지원 (데스크톱 관전자·운영자 테스트용)
 document.addEventListener('keydown', (e) => {

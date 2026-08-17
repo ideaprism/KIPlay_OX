@@ -22,10 +22,12 @@ const CONFIG = {
   port: Number(process.env.PORT) || 12055,
   adminKey: process.env.ADMIN_KEY || 'kipi',
 
-  questionMs: 7000,   // 응답 시간
-  revealMs: 3000,     // 정답 공개
-  reviveMs: 3000,     // 부활권 선택
-  suddenMs: 15000,    // 서든데스
+  // 7초는 너무 빡빡했다. 문제를 읽고, 남들이 어디로 가는지 보고, 마음을 정할 틈이 필요하다.
+  // 10초로 늘려도 한 판이 2분 안쪽이라 5분 슬롯에 여유가 있다.
+  questionMs: Number(process.env.QUESTION_MS) || 10000,
+  revealMs: 3000,     // 정답 공개 (아래 revealMsFor로 인원에 따라 늘어난다)
+  reviveMs: 4000,     // 부활권 선택
+  suddenMs: 20000,    // 서든데스
   lobbyMs: 30000,     // 기본 대기실 (실전은 5분)
   tallyMs: 1000,      // 실시간 집계 브로드캐스트 간격
 
@@ -387,6 +389,13 @@ const decidedMask = () => game.crowd.map((p) => (p.alive ? (p.answer ? '1' : '0'
 
 const tallyVisible = () => alivePlayers().length >= CONFIG.tallyVisibleFrom;
 
+/** 본부별 생존자 수. 중계 멘트("어느 본부가 가장 많이 남았는가")의 재료다. */
+function divisionCounts() {
+  const m = {};
+  for (const p of alivePlayers()) m[p.div] = (m[p.div] || 0) + 1;
+  return m;
+}
+
 /** 카메라가 가까워지는 구간에서만 이름을 붙인다. 인원이 적을 때만이라 양도 적다. */
 function namedPayload() {
   const alive = alivePlayers();
@@ -409,6 +418,11 @@ function publicState() {
     floor: game.floor,
     scene: floorScene(game.floor),
     tallyVisible: showTally,
+    tallyFrom: CONFIG.tallyVisibleFrom,
+    questionMs: CONFIG.questionMs,
+    suddenMs: CONFIG.suddenMs,
+    divAlive: divisionCounts(),
+    divisionNames: DIVISIONS.map((d) => ({ id: d.id, name: d.name, short: d.short || d.name })),
     aliveMask: game.crowd.length ? aliveMask() : null,
     named: namedPayload(),
     phaseEndsAt: game.phaseEndsAt,
@@ -596,8 +610,11 @@ function revealQuestion() {
   const fromFloor = game.floor;
   if (survivors > 0) game.floor += 1; // 정답 쪽 바닥이 올라간다
 
-  // 층 상승 연출이 끝나기 전에 게임이 넘어가면 안 된다. 인원이 적을수록 길게 본다.
-  const revealMs = survivors > 0 ? (survivors <= 10 ? 6000 : survivors < 100 ? 5000 : 4000) : CONFIG.revealMs;
+  // 층 상승 연출이 끝나기 전에 게임이 넘어가면 안 되고, 중계 멘트가 들어갈 틈도 있어야 한다.
+  // 인원이 적을수록 길게 본다 — 후반일수록 한 명 한 명이 중요해지기 때문이다.
+  const revealMs = survivors > 0
+    ? (survivors <= 10 ? 9000 : survivors < 30 ? 8000 : survivors < 100 ? 7000 : 6000)
+    : 5000;
 
   game.phase = 'reveal';
   game.phaseEndsAt = Date.now() + revealMs;

@@ -587,6 +587,62 @@ body[data-demo="1"] .screen {
   color: var(--ink-3);
 }
 
+/* ── 중계 자막
+   소리가 안 나오는 환경에서도 진행이 끊기지 않아야 한다. 자막이 먼저고 음성이 나중이다. */
+.caption {
+  margin: 0;
+  min-height: 1.5em;
+  font-size: 14.5px;
+  line-height: 1.5;
+  color: var(--ink-2);
+  flex: 0 0 auto;
+  transition: color var(--t-control) var(--ease-out);
+}
+
+.caption[data-tone="rule"] { color: var(--amber); font-weight: 700; }
+.caption[data-tone="bad"] { color: var(--out); }
+.caption[data-tone="good"] { color: var(--live); }
+.caption[data-tone="cue"] { color: var(--ink); font-weight: 700; }
+
+/* ── 선택 가리기 안내 */
+.blind-note {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--amber);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.blind-note::before {
+  content: "";
+  width: 6px; height: 6px; border-radius: 50%;
+  background: currentColor;
+  flex: 0 0 auto;
+}
+
+/* ── 대기실 하단 링크 */
+.lobby-links {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  font-size: 13px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.lobby-links a, .lobby-links button {
+  color: var(--ink-3);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  padding: 4px 0;
+  font-size: 13px;
+}
+
+.lobby-links a:hover, .lobby-links button:hover { color: var(--amber); border-bottom-color: currentColor; }
+.lobby-links button[aria-pressed="false"] { color: var(--out); }
+
 /* ── 전송 상태
    버튼이 눌린 것과 서버가 받은 것은 다르다. 답안 유실은 곧 억울한 탈락이므로
    도달 여부를 반드시 눈에 보이게 알린다. 시각 효과만으로 상태를 대신하지 않는다. */

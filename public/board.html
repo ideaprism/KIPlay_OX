@@ -92,6 +92,29 @@ body { overflow: hidden; }
 
 .stage-foot { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; }
 
+/* 중계 자막 — 소리가 안 나는 환경에서도 진행이 읽혀야 한다 */
+.bcaption {
+  margin: 0;
+  min-height: 1.5em;
+  font-size: clamp(14px, 1.3vw, 22px);
+  line-height: 1.45;
+  color: var(--ink-2);
+}
+.bcaption[data-tone="rule"] { color: var(--amber); font-weight: 700; }
+.bcaption[data-tone="bad"] { color: var(--out); }
+.bcaption[data-tone="good"] { color: var(--live); }
+.bcaption[data-tone="cue"] { color: var(--ink); font-weight: 700; }
+
+/* 본부별 잔여 현황 */
+.divstand { display: flex; flex-direction: column; border-bottom: 1px solid var(--line); }
+.divstand .row {
+  display: grid; grid-template-columns: 10px 1fr auto; gap: 8px; align-items: center;
+  padding: 6px 16px; font-size: clamp(11px, 0.95vw, 15px);
+}
+.divstand .row i { width: 10px; height: 10px; border-radius: 2px; display: block; }
+.divstand .row .n { font-family: var(--mono); font-variant-numeric: tabular-nums; font-weight: 700; }
+.divstand .row.lead .n { color: var(--amber); }
+
 .bcount { display: flex; align-items: baseline; gap: clamp(10px, 1.2vw, 20px); }
 .bcount .n {
   font-family: var(--mono); font-variant-numeric: tabular-nums;
@@ -210,6 +233,7 @@ body { overflow: hidden; }
     <div class="stage-info">
       <h1 class="bq" id="b-question"></h1>
       <div class="btimer" id="b-timer"><div class="fill" id="b-timer-fill"></div></div>
+      <p class="bcaption" id="b-caption" role="status" aria-live="polite"></p>
       <div class="stage-foot">
         <div class="bcount">
           <span class="n mono" id="b-alive">0</span>
@@ -255,7 +279,8 @@ body { overflow: hidden; }
       </div>
     </div>
 
-    <div class="divlegend" id="b-legend"></div>
+    <h2>본부별 생존</h2>
+    <div class="divstand" id="b-divstand"></div>
 
     <h2>탈락</h2>
     <div class="feed" id="b-feed"></div>
@@ -264,6 +289,7 @@ body { overflow: hidden; }
 
 <script src="crowd.js"></script>
 <script src="sfx.js"></script>
+<script src="commentary.js"></script>
 <script src="board.js"></script>
 </body>
 </html>

@@ -103,6 +103,11 @@
   </p>
 
   <button class="btn" id="lobby-demo" hidden>혼자 체험해보기</button>
+
+  <div class="lobby-links">
+    <a href="/board.html" target="_blank" rel="noopener">전광판 열기 ↗</a>
+    <button type="button" id="narration-toggle" aria-pressed="true">나레이션 켜짐</button>
+  </div>
 </section>
 
 <!-- ══════════════════════════════════ 문항 진행 -->
@@ -128,7 +133,10 @@
       <span>O <b id="num-o">0</b></span>
       <span><b id="num-x">0</b> X</span>
     </div>
+    <p class="blind-note" id="blind-note" hidden></p>
   </div>
+
+  <p class="caption" id="caption" role="status" aria-live="polite"></p>
 
   <p class="send-state" id="send-state" role="status" aria-live="polite"></p>
 
@@ -253,6 +261,7 @@
 
 <script src="crowd.js"></script>
 <script src="sfx.js"></script>
+<script src="commentary.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

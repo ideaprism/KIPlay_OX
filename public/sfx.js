@@ -151,33 +151,106 @@
                  this.tone({ freq: 90, to: 260, dur: 1.1, type: 'sine', gain: 0.08 }); },
 
     // ── 나레이션
+    //
+    // 음성 합성은 함정이 많다.
+    //   · getVoices()가 첫 호출에서 빈 배열을 돌려준다 (비동기 로드)
+    //   · utterance를 붙잡아두지 않으면 말하는 도중 GC되어 잘린다
+    //   · Chrome은 긴 문장에서 15초쯤 뒤 스스로 멈춘다 (pause/resume으로 되살린다)
+    //   · 앞 문장이 끝나기 전에 speak하면 큐에 쌓여 한참 뒤에 나온다
     voice: null,
+    voicesReady: false,
+    _queue: [],
+    _held: [],
+    narrationOn: true,
 
-    _pickVoice() {
-      if (!('speechSynthesis' in global)) return null;
-      if (this.voice) return this.voice;
+    _loadVoices() {
+      if (!('speechSynthesis' in global)) return false;
       const all = global.speechSynthesis.getVoices();
-      this.voice = all.find((v) => v.lang && v.lang.toLowerCase().startsWith('ko')) || null;
-      return this.voice;
+      if (!all.length) return false;
+      this.voicesReady = true;
+      this.voice =
+        all.find((v) => v.lang && v.lang.toLowerCase().startsWith('ko')) ||
+        all.find((v) => /korean|한국/i.test(v.name)) ||
+        null;
+      return true;
     },
 
-    say(text, { rate = 0.98, pitch = 0.9, force = false } = {}) {
-      if (!('speechSynthesis' in global) || this.muted || !text) return;
-      if (force) global.speechSynthesis.cancel();
+    /** 대기 중이던 문장을 음성 목록이 준비된 뒤 밀어낸다. */
+    _flush() {
+      if (!this.voicesReady && !this._loadVoices()) return;
+      const q = this._queue.splice(0);
+      for (const item of q) this._speak(item.text, item.opts);
+    },
+
+    _speak(text, { rate = 1, pitch = 0.95, volume = 1 } = {}) {
+      const synth = global.speechSynthesis;
       const u = new SpeechSynthesisUtterance(text);
       u.lang = 'ko-KR';
       u.rate = rate;
       u.pitch = pitch;
-      const v = this._pickVoice();
-      if (v) u.voice = v;
-      global.speechSynthesis.speak(u);
+      u.volume = volume;
+      if (this.voice) u.voice = this.voice;
+
+      // GC 방지 — 참조를 들고 있다가 끝나면 놓는다
+      this._held.push(u);
+      const release = () => {
+        const i = this._held.indexOf(u);
+        if (i >= 0) this._held.splice(i, 1);
+        clearInterval(keepAlive);
+      };
+      u.onend = release;
+      u.onerror = release;
+
+      // Chrome이 스스로 멈추는 것을 되살린다
+      const keepAlive = setInterval(() => {
+        if (!synth.speaking) { clearInterval(keepAlive); return; }
+        synth.pause();
+        synth.resume();
+      }, 5000);
+
+      synth.speak(u);
     },
 
-    silence() { if ('speechSynthesis' in global) global.speechSynthesis.cancel(); },
+    say(text, opts = {}) {
+      if (!('speechSynthesis' in global) || this.muted || !this.narrationOn || !text) return;
+      if (opts.force) global.speechSynthesis.cancel();
+
+      // 큐가 밀리면 진행보다 멘트가 늦어진다. 두 문장 이상 밀렸으면 오래된 것을 버린다.
+      if (this._queue.length > 2) this._queue.splice(0, this._queue.length - 2);
+
+      if (this.voicesReady || this._loadVoices()) this._speak(text, opts);
+      else this._queue.push({ text, opts });
+    },
+
+    silence() {
+      this._queue.length = 0;
+      if ('speechSynthesis' in global) global.speechSynthesis.cancel();
+    },
+
+    /** 실제로 소리가 나는지 확인용. 준비 상태를 돌려준다. */
+    voiceStatus() {
+      const supported = 'speechSynthesis' in global;
+      const all = supported ? global.speechSynthesis.getVoices() : [];
+      return {
+        supported,
+        ready: this.voicesReady,
+        total: all.length,
+        picked: this.voice ? `${this.voice.name} (${this.voice.lang})` : null,
+        korean: all.filter((v) => v.lang && v.lang.toLowerCase().startsWith('ko')).map((v) => v.name),
+      };
+    },
   };
 
   if ('speechSynthesis' in global) {
-    global.speechSynthesis.addEventListener('voiceschanged', () => { Sfx.voice = null; });
+    global.speechSynthesis.addEventListener('voiceschanged', () => {
+      Sfx.voicesReady = false;
+      Sfx._flush();
+    });
+    // 목록이 늦게 채워지는 브라우저를 위해 몇 번 더 시도한다
+    let tries = 0;
+    const poll = setInterval(() => {
+      if (Sfx._loadVoices() || (tries += 1) > 20) { clearInterval(poll); Sfx._flush(); }
+    }, 250);
   }
 
   global.Sfx = Sfx;

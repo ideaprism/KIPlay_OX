@@ -74,7 +74,7 @@ function loop() {
   const remain = snap.phaseEndsAt - now();
 
   if (snap.phase === 'question' || snap.phase === 'sudden') {
-    const total = snap.phase === 'sudden' ? 15000 : 7000;
+    const total = snap.phase === 'sudden' ? (snap.suddenMs || 20000) : (snap.questionMs || 10000);
     $('b-timer-fill').style.transform = `scaleX(${Math.max(0, Math.min(1, remain / total))})`;
     $('b-timer').classList.toggle('urgent', remain <= 3000);
   } else if (snap.phase === 'lobby') {
@@ -123,16 +123,60 @@ function renderSplit(s) {
   $('b-num-x').textContent = `${x} X`;
 }
 
-function renderLegend(divisions) {
-  const box = $('b-legend');
-  if (!divisions || box.dataset.done) return;
-  box.dataset.done = '1';
+let divColors = new Map();
+
+/** 본부별 잔여 현황. 어느 본부가 버티고 있는지가 부서 대항의 서사다. */
+function renderDivStanding(s) {
+  const box = $('b-divstand');
+  const counts = s.divAlive || {};
+  const names = new Map((s.divisionNames || []).map((d) => [d.id, d]));
+  const rows = Object.entries(counts)
+    .filter(([, n]) => n > 0)
+    .sort((a, b) => b[1] - a[1]);
+
+  if (!rows.length) { box.innerHTML = ''; return; }
+  const top = rows[0][1];
+
   box.innerHTML = '';
-  for (const d of divisions) {
+  for (const [id, n] of rows) {
+    const info = names.get(id) || {};
     const el = document.createElement('div');
-    el.innerHTML = `<i style="background:${d.color}"></i>${d.short || d.name}`;
+    el.className = 'row' + (n === top ? ' lead' : '');
+    el.innerHTML =
+      `<i style="background:${divColors.get(id) || '#8B93B0'}"></i>` +
+      `<span>${info.short || info.name || id}</span>` +
+      `<span class="n">${n}</span>`;
     box.appendChild(el);
   }
+}
+
+// ── 중계
+const commentary = new Commentary();
+const captionQueue = [];
+let captionTimer = null;
+
+function showCaption(line) {
+  const el = $('b-caption');
+  el.textContent = line.text;
+  el.dataset.tone = line.tone || '';
+  clearTimeout(captionTimer);
+  captionTimer = setTimeout(() => { el.textContent = ''; el.dataset.tone = ''; }, 8000);
+  if (audioReady) Sfx.say(line.say || line.text);
+}
+
+function drainCaptions() {
+  const line = captionQueue.shift();
+  if (!line) return;
+  showCaption(line);
+  if (captionQueue.length) setTimeout(drainCaptions, 3000);
+}
+
+/** 여러 줄이 한꺼번에 나오면 읽히지 않는다. 간격을 두고 하나씩 흘린다. */
+function runCommentary(s) {
+  const lines = commentary.update(s);
+  if (!lines.length) return;
+  for (const line of lines) captionQueue.push(line);
+  if (captionQueue.length === lines.length) drainCaptions();
 }
 
 function renderFeed(feed) {
@@ -158,8 +202,13 @@ function render(s) {
   snap = s;
   clockOffset = s.serverNow - Date.now();
 
-  if (s.crowd) { stage.setCrowd(s.crowd); renderLegend(s.crowd.divisions); }
+  if (s.crowd) {
+    stage.setCrowd(s.crowd);
+    divColors = new Map((s.crowd.divisions || []).map((d) => [d.id, d.color]));
+  }
   stage.setState(s);
+  renderDivStanding(s);
+  runCommentary(s);
 
   $('b-round').textContent = s.round ? pad2(s.round) : '—';
   $('b-joined').textContent = s.joined;
@@ -209,7 +258,6 @@ function render(s) {
       $('b-center-floor').hidden = true;
       $('b-center-sub').textContent = `${s.joined}명 입장`;
       $('b-center-list').hidden = true;
-      if (phaseChanged && audioReady) Sfx.say('잠시 후 시작합니다.');
       break;
 
     case 'question':
@@ -220,12 +268,7 @@ function render(s) {
       renderSplit(s);
       if (s.qIndex !== lastQIndex) {
         lastQIndex = s.qIndex;
-        if (audioReady) {
-          Sfx.gong();
-          const diff = s.question && s.question.difficulty;
-          const ko = diff === 'hard' ? '어려움' : diff === 'medium' ? '보통' : '쉬움';
-          setTimeout(() => Sfx.say(`${s.qIndex + 1}번 문항. 난이도 ${ko}.`), 900);
-        }
+        if (audioReady) Sfx.gong();
       }
       break;
 
@@ -243,11 +286,6 @@ function render(s) {
         if (audioReady) {
           Sfx.correct();
           if (r.alive > 0) setTimeout(() => Sfx.rise(), 400);
-          setTimeout(() => Sfx.say(
-            r.alive > 0
-              ? `정답 ${r.answer === 'O' ? '오' : '엑스'}. ${r.eliminatedCount}명 탈락. ${r.alive}명이 ${r.toFloor}층으로 올라갑니다.`
-              : `정답 ${r.answer === 'O' ? '오' : '엑스'}. 전원 탈락.`,
-          ), 1100);
         }
       }
       break;
@@ -262,10 +300,7 @@ function render(s) {
       $('b-question').textContent = s.sudden ? s.sudden.text : '';
       $('b-drop').textContent = 'SUDDEN DEATH';
       $('b-split').hidden = true; // 서든데스는 O/X가 아니라 숫자 입력이다
-      if (phaseChanged && audioReady) {
-        Sfx.gong({ freq: 74, gain: 0.55 });
-        setTimeout(() => Sfx.say('서든데스. 가장 가까운 숫자가 이깁니다.'), 900);
-      }
+      if (phaseChanged && audioReady) Sfx.gong({ freq: 74, gain: 0.55 });
       break;
 
     case 'result': {
@@ -300,14 +335,7 @@ function render(s) {
         list.appendChild(el);
       }
 
-      if (phaseChanged && audioReady) {
-        Sfx.champ();
-        setTimeout(() => Sfx.say(
-          r && r.champion
-            ? `${r.floor}층. 오늘의 챔피언은 ${r.champion.dept} ${r.champion.name}님입니다.`
-            : '전원 탈락. 챔피언이 나오지 않았습니다.',
-        ), 1000);
-      }
+      if (phaseChanged && audioReady) Sfx.champ();
       break;
     }
   }
