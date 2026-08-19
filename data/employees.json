@@ -24,12 +24,12 @@
   },
 
   "divisions": [
-    { "id": "mgmt", "name": "경영관리본부",     "short": "경영", "color": "#5B84F0" },
-    { "id": "util", "name": "정보활용본부",     "short": "활용", "color": "#2FC4D9" },
-    { "id": "sys",  "name": "정보시스템본부",   "short": "시스템", "color": "#A06CE8" },
-    { "id": "ai",   "name": "지능정보화센터",   "short": "지능", "color": "#BFD645" },
-    { "id": "plat", "name": "분석플랫폼지원단", "short": "분석", "color": "#EE6BA8" },
-    { "id": "etc",  "name": "감사·원장실",      "short": "기타", "color": "#8B93B0" }
+    { "id": "mgmt", "name": "경영관리본부",     "short": "경영", "color": "#6B7B8C" },
+    { "id": "util", "name": "정보활용본부",     "short": "활용", "color": "#6F8489" },
+    { "id": "sys",  "name": "정보시스템본부",   "short": "시스템", "color": "#7A6B8C" },
+    { "id": "ai",   "name": "지능정보화센터",   "short": "지능", "color": "#7E8F7A" },
+    { "id": "plat", "name": "분석플랫폼지원단", "short": "분석", "color": "#8C6F6F" },
+    { "id": "etc",  "name": "감사·원장실",      "short": "기타", "color": "#8C8468" }
   ],
 
   "departments": [

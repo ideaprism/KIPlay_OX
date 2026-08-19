@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>12:55 — 옥상 배경 맞추기</title>
+<style>
+  :root {
+    --bg: #12141B; --panel: #1A1D26; --line: #2A2E3A;
+    --ink: #E8EAF0; --muted: #929AAA; --accent: #FFB43C;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 14px/1.6 "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 28px 22px 64px; }
+  h1 { font-size: 20px; margin: 0 0 4px; letter-spacing: -.01em; }
+  .sub { color: var(--muted); margin: 0 0 24px; font-size: 13px; }
+  .sub code { color: var(--accent); }
+
+  .drop {
+    border: 1.5px dashed var(--line); border-radius: 8px; padding: 26px;
+    text-align: center; color: var(--muted); cursor: pointer; background: var(--panel);
+    transition: border-color .15s, color .15s;
+  }
+  .drop:hover, .drop.over { border-color: var(--accent); color: var(--ink); }
+  .drop input { display: none; }
+
+  .cols { display: grid; grid-template-columns: 1fr; gap: 22px; margin-top: 22px; }
+  @media (min-width: 900px) { .cols { grid-template-columns: 300px 1fr; } }
+
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px; }
+  .panel h2 { font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin: 0 0 14px; font-weight: 600; }
+
+  label { display: block; margin-bottom: 14px; font-size: 12.5px; color: var(--muted); }
+  label b { color: var(--ink); font-weight: 600; float: right; font-variant-numeric: tabular-nums; }
+  input[type=range] { width: 100%; margin-top: 6px; accent-color: var(--accent); }
+  select { width: 100%; margin-top: 6px; background: #0E1017; color: var(--ink);
+           border: 1px solid var(--line); border-radius: 5px; padding: 6px 8px; font: inherit; font-size: 13px; }
+
+  .shots { display: flex; flex-direction: column; gap: 18px; }
+  .shot h3 { font-size: 12px; color: var(--muted); margin: 0 0 6px; font-weight: 600;
+             display: flex; justify-content: space-between; }
+  .shot h3 span { color: var(--accent); font-variant-numeric: tabular-nums; }
+  canvas { display: block; width: 100%; height: auto; border-radius: 6px; border: 1px solid var(--line); background: #000; }
+  canvas.px { image-rendering: pixelated; }
+
+  .out { margin-top: 22px; }
+  textarea {
+    width: 100%; height: 190px; background: #0E1017; color: #C8D2E0;
+    border: 1px solid var(--line); border-radius: 6px; padding: 12px;
+    font: 12.5px/1.65 ui-monospace, "SFMono-Regular", Consolas, monospace; resize: vertical;
+  }
+  .hint { color: var(--muted); font-size: 12.5px; margin: 10px 0 0; }
+  .hint b { color: var(--ink); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>옥상 배경 맞추기</h1>
+  <p class="sub">
+    사진을 끌어다 놓으면 <code>roofimage.js</code>의 변환을 그대로 통과시켜 보여줍니다.
+    맞춰야 할 값은 하나 —— <b>난간선</b>입니다. 원본에서 난간 윗선이 세로로 몇 %에 있는지
+    맞추면, 어떤 비율에서도 우승자가 난간 안쪽에 섭니다.
+  </p>
+
+  <label class="drop" id="drop">
+    <input type="file" id="file" accept="image/*">
+    사진을 여기에 끌어다 놓거나 눌러서 고르세요
+  </label>
+
+  <div class="cols">
+    <div class="panel">
+      <h2>맞추기</h2>
+
+      <label>난간선 <b id="v-edge">0.66</b>
+        <input type="range" id="edge" min="0.20" max="0.95" step="0.005" value="0.66">
+      </label>
+      <label>우승자 발 위치 <b id="v-stand">0.86</b>
+        <input type="range" id="stand" min="0.60" max="0.99" step="0.005" value="0.86">
+      </label>
+
+      <h2 style="margin-top:20px">스타일</h2>
+      <label>팔레트
+        <select id="palette">
+          <option value="ink5" selected>ink5 — 특허 도면</option>
+          <option value="">변환 없음 (사진 그대로)</option>
+        </select>
+      </label>
+      <label>저해상도 버퍼
+        <select id="buffer">
+          <option value="" selected>없음 (원본 해상도)</option>
+          <option value="240">240px</option>
+          <option value="384">384px</option>
+          <option value="512">512px</option>
+        </select>
+      </label>
+      <label>디더링 <b id="v-dither">44</b>
+        <input type="range" id="dither" min="0" max="72" step="1" value="44">
+      </label>
+
+      <h2 style="margin-top:20px">보정</h2>
+      <label>밝기 <b id="v-bri">4</b>
+        <input type="range" id="bri" min="-60" max="60" step="1" value="4">
+      </label>
+      <label>대비 <b id="v-con">0.22</b>
+        <input type="range" id="con" min="-0.5" max="0.8" step="0.01" value="0.22">
+      </label>
+      <label>채도 <b id="v-sat">-1.00</b>
+        <input type="range" id="sat" min="-1" max="1" step="0.02" value="-1">
+      </label>
+    </div>
+
+    <div class="shots">
+      <div class="shot">
+        <h3>데스크톱 참여자 <span>5.4 : 1</span></h3>
+        <canvas id="cv-wide" width="1223" height="228"></canvas>
+      </div>
+      <div class="shot">
+        <h3>전광판 <span>16 : 9</span></h3>
+        <canvas id="cv-board" width="1024" height="576"></canvas>
+      </div>
+      <div class="shot">
+        <h3>폰 참여자 <span>1.36 : 1</span></h3>
+        <canvas id="cv-tall" width="776" height="572"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="out">
+    <h2 style="font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:0 0 10px;">
+      roofimage.js 에 붙여넣기
+    </h2>
+    <textarea id="config" readonly></textarea>
+    <p class="hint">
+      세 화면 모두에서 <b>빨간 선이 사진 속 난간 윗선과 겹치고</b>, 회색 사람의 발이 난간 안쪽 바닥을 딛고
+      상반신이 난간선 위로 올라오면 맞은 것입니다. 가로와 세로는 보통 <b>다른 사진</b>이 필요합니다 ——
+      한 장으로 5.4:1과 1.36:1을 모두 감당할 수 없습니다.
+    </p>
+  </div>
+
+</div>
+
+<script src="roofimage.js"></script>
+<script src="crowd.js"></script>
+<script>
+(() => {
+  'use strict';
+
+  const $ = (id) => document.getElementById(id);
+  const DST_EDGE = window.ROOF_GEOMETRY.edge;
+
+  const shots = [
+    { cv: $('cv-wide'), bd: null },
+    { cv: $('cv-board'), bd: null },
+    { cv: $('cv-tall'), bd: null },
+  ];
+
+  let url = null;
+  let raf = null;
+
+  function cfg() {
+    const pal = $('palette').value || null;
+    const buf = $('buffer').value ? Number($('buffer').value) : null;
+    return {
+      palette: pal,
+      buffer: buf,
+      dither: Number($('dither').value),
+      grade: {
+        brightness: Number($('bri').value),
+        contrast: Number($('con').value),
+        saturation: Number($('sat').value),
+      },
+      edge: Number($('edge').value),
+      stand: Number($('stand').value),
+    };
+  }
+
+  /** 우승자 대역. crowd.js가 세우는 것과 같은 비례로 그린다. */
+  function drawStandIn(c, W, H, stand) {
+    const r = H * 0.16;
+    const x = W / 2;
+    const y = H * stand;
+    c.fillStyle = 'rgba(0,0,0,.45)';
+    c.beginPath();
+    c.ellipse(x, y + r * 0.9, r * 0.9, r * 0.35, 0, 0, 6.283);
+    c.fill();
+    c.fillStyle = 'rgba(214,214,222,.92)';
+    c.fillRect(x - r * 0.24, y - r * 1.1, r * 0.2, r * 1.1);
+    c.fillRect(x + r * 0.04, y - r * 1.1, r * 0.2, r * 1.1);
+    c.beginPath();
+    c.moveTo(x - r * 0.62, y - r * 1.1);
+    c.lineTo(x - r * 0.4, y - r * 2.15);
+    c.lineTo(x + r * 0.4, y - r * 2.15);
+    c.lineTo(x + r * 0.62, y - r * 1.1);
+    c.closePath();
+    c.fill();
+    c.beginPath();
+    c.arc(x, y - r * 2.6, r * 0.55, 0, 6.283);
+    c.fill();
+  }
+
+  function render() {
+    const c0 = cfg();
+    $('v-edge').textContent = c0.edge.toFixed(3);
+    $('v-stand').textContent = c0.stand.toFixed(3);
+    $('v-dither').textContent = c0.dither;
+    $('v-bri').textContent = c0.grade.brightness;
+    $('v-con').textContent = c0.grade.contrast.toFixed(2);
+    $('v-sat').textContent = c0.grade.saturation.toFixed(2);
+
+    $('config').value =
+      'sources: [\n' +
+      '  { src: \'img/rooftop-wide.webp\', minAspect: 2.0, edge: ' + c0.edge.toFixed(3) +
+      ', stand: ' + c0.stand.toFixed(3) + ' },\n' +
+      '  { src: \'img/rooftop-tall.webp\', minAspect: 0,   edge: 0.62, stand: 0.84 },\n' +
+      '],\n' +
+      'palette: ' + (c0.palette ? '\'' + c0.palette + '\'' : 'null') + ',\n' +
+      'buffer: ' + (c0.buffer === null ? 'null' : c0.buffer) + ',\n' +
+      'dither: ' + c0.dither + ',\n' +
+      'grade: { brightness: ' + c0.grade.brightness +
+      ', contrast: ' + c0.grade.contrast.toFixed(2) +
+      ', saturation: ' + c0.grade.saturation.toFixed(2) + ' },';
+
+    for (const s of shots) {
+      const c = s.cv.getContext('2d');
+      const W = s.cv.width, H = s.cv.height;
+      s.cv.classList.toggle('px', !!c0.buffer);
+
+      c.setTransform(1, 0, 0, 1, 0, 0);
+      c.clearRect(0, 0, W, H);
+
+      if (s.bd && s.bd.ready()) {
+        s.bd.palette = c0.palette ? window.ROOF_PALETTES[c0.palette] : null;
+        s.bd.buffer = c0.buffer;
+        s.bd.dither = c0.dither;
+        s.bd.grade = c0.grade;
+        s.bd.pick.edge = c0.edge;
+        s.bd.out = null;                    // 값이 바뀌었으니 다시 만든다
+        s.bd.build(W, H, DST_EDGE);
+        s.bd.draw(c, W, H);
+      } else {
+        c.fillStyle = '#0E1017';
+        c.fillRect(0, 0, W, H);
+        c.fillStyle = '#4A5060';
+        c.font = '600 15px system-ui, sans-serif';
+        c.textAlign = 'center';
+        c.fillText('사진을 올리면 여기에 나옵니다', W / 2, H / 2);
+      }
+
+      // 무대가 난간선으로 삼는 높이
+      c.strokeStyle = 'rgba(220,40,30,.95)';
+      c.lineWidth = 2;
+      c.setLineDash([9, 6]);
+      c.beginPath();
+      c.moveTo(0, H * DST_EDGE);
+      c.lineTo(W, H * DST_EDGE);
+      c.stroke();
+      c.setLineDash([]);
+
+      drawStandIn(c, W, H, c0.stand);
+    }
+  }
+
+  function schedule() {
+    if (raf) cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(() => { raf = null; render(); });
+  }
+
+  function useFile(f) {
+    if (!f || !/^image\//.test(f.type)) return;
+    if (url) URL.revokeObjectURL(url);
+    url = URL.createObjectURL(f);
+    let pending = shots.length;
+    for (const s of shots) {
+      s.bd = new window.RoofBackdrop({
+        sources: [{ src: url, minAspect: 0, edge: Number($('edge').value) }],
+      });
+      s.bd.load(1).then(() => { pending -= 1; if (!pending) render(); });
+    }
+  }
+
+  $('file').addEventListener('change', (e) => useFile(e.target.files[0]));
+
+  const drop = $('drop');
+  ['dragenter', 'dragover'].forEach((ev) =>
+    drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add('over'); }));
+  ['dragleave', 'drop'].forEach((ev) =>
+    drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove('over'); }));
+  drop.addEventListener('drop', (e) => useFile(e.dataTransfer.files[0]));
+
+  for (const id of ['edge', 'stand', 'palette', 'buffer', 'dither', 'bri', 'con', 'sat']) {
+    $(id).addEventListener('input', schedule);
+  }
+
+  render();
+})();
+</script>
+</body>
+</html>

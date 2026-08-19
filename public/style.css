@@ -2,10 +2,13 @@
    12:55 — 디자인 시스템
 
    CONSTRAINTS CARD
-     FONT   시스템 산세리프(제목·본문) + ui-monospace(모든 숫자·라벨)
-     STYLE  다크 아레나. 인디고 블랙 바탕에 시그널 앰버 단일 강조색.
-            세계관은 카운트다운 시계 · 스타디움 전광판 · 출발안내판.
-     MODE   다크 전용. 의도적 단일 테마이므로 모든 색을 명시적으로 칠한다.
+     FONT   명조(제목·본문) + 고딕(라벨) + ui-monospace(숫자·부호)
+     STYLE  등록특허공보. 크림 용지에 먹 선화, 인주 빨강 단 하나의 강조색.
+            세계관은 명세서 · 도면 · 부호의 설명. INID 괄호 숫자가 서명이다.
+     MODE   라이트 전용. 의도적 단일 테마이므로 모든 색을 명시적으로 칠한다.
+
+     인주는 판정에만 쓴다. 정답이 공개될 때만 화면에 빨강이 등장하므로
+     그 색을 보는 것이 곧 결과를 아는 것이다. 다른 곳에 쓰면 그 힘이 죽는다.
 
    존 규칙 (상충하는 원칙의 해소)
      참여자 화면 — 극적이어도 된다. 스큐어모픽 O/X 버튼, 글로우, 플래시 허용.
@@ -14,31 +17,31 @@
    ═══════════════════════════════════════════════════════════════ */
 
 :root {
-  /* ── 지면과 표면 */
-  --ground: #0E1020;
-  --surface: #171A2D;
-  --surface-2: #1F2338;
-  --surface-3: #262B44;
+  /* ── 지면과 표면. 공보 용지다. */
+  --ground: #EFEBE1;
+  --surface: #FAF7F0;
+  --surface-2: #FFFFFF;
+  --surface-3: #F2EEE4;
 
   /* ── 글자 */
-  --ink: #EEEEF6;
-  --ink-2: #AFB4CE;
-  --ink-3: #838AAA;
+  --ink: #141414;
+  --ink-2: #5A5A5A;
+  --ink-3: #6E675C;   /* 지면 위에서 4.5:1을 넘기는 하한. 전광판 3m 판독이 기준이다. */
 
-  /* ── 선 */
-  --line: #2A2F49;
-  --line-2: #3A4062;
+  /* ── 괘선 */
+  --line: #C8C2B6;
+  --line-2: #A79F90;
 
-  /* ── 단일 강조색. 무지개 금지. */
-  --amber: #FFB43C;
-  --amber-deep: #C25E06;
-  --amber-soft: rgba(255, 180, 60, 0.14);
+  /* ── 단일 강조색은 인주다. 판정에만 쓴다. */
+  --amber: #B03A2E;
+  --amber-deep: #8A2B21;
+  --amber-soft: rgba(176, 58, 46, 0.10);
 
-  /* ── 의미색. 강조색과 별개 축이다. */
-  --live: #4FC08D;
-  --live-soft: rgba(79, 192, 141, 0.14);
-  --out: #F0736A;
-  --out-soft: rgba(240, 115, 106, 0.14);
+  /* ── 의미색. 도면에서 생사는 색이 아니라 선으로 가른다. */
+  --live: #1F1F1F;
+  --live-soft: rgba(20, 20, 20, 0.06);
+  --out: #B03A2E;
+  --out-soft: rgba(176, 58, 46, 0.10);
 
   /* ── 이징. 진입은 ease-out, 이탈은 ease-in으로 더 짧게. */
   --ease-out-soft: cubic-bezier(0.25, 0.46, 0.45, 0.94);
@@ -64,7 +67,9 @@
   --sp-3: 24px;
 
   --mono: ui-monospace, SFMono-Regular, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
-  --sans: "Pretendard Variable", Pretendard, "Apple SD Gothic Neo", "Malgun Gothic", system-ui, -apple-system, sans-serif;
+  --sans: "Malgun Gothic", "맑은 고딕", "Apple SD Gothic Neo", system-ui, -apple-system, sans-serif;
+  /* 공보 본문은 명조다. 바탕/Batang은 국내 어느 기기에나 있어 내려받을 것이 없다. */
+  --serif: "Nanum Myeongjo", Batang, 바탕, "Apple SD Gothic Neo", serif;
 }
 
 /* ─────────────────────────────────────────────── 기본 */
@@ -167,7 +172,7 @@ body[data-screen="result"] #s-result { display: flex; }
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.14em;
-  color: #241503;
+  color: #FAF7F0;
   background: var(--amber);
 }
 
@@ -189,6 +194,7 @@ body[data-demo="1"] .screen {
 }
 
 .demo-title {
+  font-family: var(--serif);
   font-size: clamp(23px, 6vw, 30px);
   font-weight: 700;
   letter-spacing: -0.025em;
@@ -201,9 +207,10 @@ body[data-demo="1"] .screen {
 
 .chips { display: flex; gap: 8px; flex-wrap: wrap; }
 
+/* 공보에 알약 모양은 없다. 네모난 항목 상자다. */
 .chip {
   padding: 11px 16px;
-  border-radius: 100px;
+  border-radius: 2px;
   background: var(--surface);
   border: 1px solid var(--line-2);
   font-size: 14px;
@@ -214,10 +221,11 @@ body[data-demo="1"] .screen {
 }
 
 .chip[aria-pressed="true"] {
-  border-color: var(--amber);
-  color: var(--amber);
+  border-color: var(--amber-deep);
+  color: var(--amber-deep);
   background: var(--amber-soft);
   font-weight: 700;
+  box-shadow: inset 0 0 0 2px var(--surface), inset 0 0 0 3px var(--amber-deep);
 }
 
 .demo-actions { display: grid; grid-template-columns: 1fr auto; gap: 10px; }
@@ -284,7 +292,7 @@ body[data-demo="1"] .screen {
   border: 1px solid transparent;
   background:
     linear-gradient(var(--surface), var(--surface)) padding-box,
-    linear-gradient(135deg, rgba(255, 255, 255, 0.22), rgba(255, 180, 60, 0.3), rgba(255, 255, 255, 0.06)) border-box;
+    linear-gradient(135deg, rgba(20, 20, 20, 0.22), rgba(176, 58, 46, 0.3), rgba(20, 20, 20, 0.06)) border-box;
   font-family: var(--mono);
   font-variant-numeric: tabular-nums;
   font-size: 22px;
@@ -303,29 +311,28 @@ body[data-demo="1"] .screen {
 
 .btn {
   padding: 15px 22px;
-  border-radius: 12px;
+  border-radius: 2px;
   font-weight: 700;
   font-size: 16px;
   letter-spacing: -0.01em;
-  background: linear-gradient(180deg, #22263D, #171A2D 48%, #0F1223);
-  box-shadow:
-    0 10px 22px rgba(0, 0, 0, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.09),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.5);
+  background: var(--surface);
+  border: 1.5px solid var(--ink);
+  color: var(--ink);
+  box-shadow: none;
   transition: transform var(--t-press) var(--ease-out-soft),
               box-shadow var(--t-control) var(--ease-out);
 }
 
-.btn:active { transform: translateY(1px); box-shadow: inset 0 4px 10px rgba(0, 0, 0, 0.5); }
+.btn:active { transform: translateY(1px); box-shadow: inset 0 4px 10px rgba(20, 20, 20, 0.10); }
 
+/* 접수 도장을 누르는 버튼. 인쇄물이므로 광택도 그라디언트도 없다. */
 .btn-primary {
-  background: linear-gradient(180deg, #FFC661, var(--amber) 46%, #E08A12);
-  color: #241503;
-  box-shadow:
-    0 10px 26px rgba(255, 180, 60, 0.22),
-    inset 0 1px 0 rgba(255, 255, 255, 0.5),
-    inset 0 -1px 0 rgba(120, 60, 0, 0.4);
+  background: var(--amber);
+  color: var(--surface);
+  border-color: var(--amber-deep);
+  box-shadow: inset 0 0 0 2px var(--surface), inset 0 0 0 3.5px var(--amber);
 }
+.btn-primary:hover { background: var(--amber-deep); }
 
 .btn:disabled { opacity: 0.4; cursor: default; }
 
@@ -413,7 +420,7 @@ body[data-demo="1"] .screen {
   border: 1px solid transparent;
   background:
     linear-gradient(var(--surface), var(--surface)) padding-box,
-    linear-gradient(135deg, rgba(255, 255, 255, 0.2), rgba(255, 180, 60, 0.28), rgba(255, 255, 255, 0.05)) border-box;
+    linear-gradient(135deg, rgba(20, 20, 20, 0.2), rgba(176, 58, 46, 0.28), rgba(20, 20, 20, 0.05)) border-box;
   font-size: 14.5px;
 }
 
@@ -493,7 +500,7 @@ body[data-demo="1"] .screen {
   will-change: transform;
 }
 
-.timer.urgent .fill { background: linear-gradient(90deg, #B3352C, var(--out)); }
+.timer.urgent .fill { background: var(--out); }
 
 /* 군중 — 폰에서는 O/X 버튼이 여전히 최우선이므로 상단에 작게 둔다.
    진짜 쇼는 전광판이 담당한다. */
@@ -539,7 +546,9 @@ body[data-demo="1"] .screen {
   min-height: 0;
 }
 
+/* 문항은 명세서 본문이다. 명조로 짠다. */
 .qtext {
+  font-family: var(--serif);
   font-size: clamp(21px, 5.6vw, 32px);
   font-weight: 700;
   line-height: 1.45;
@@ -695,74 +704,68 @@ body[data-demo="1"] .screen {
 
 .choice {
   position: relative;
-  border-radius: 22px;
+  border-radius: 2px;
   display: grid;
   place-items: center;
   overflow: hidden;
-  background:
-    linear-gradient(180deg, #1B1E33, #141728 48%, #0B0D1A) padding-box,
-    linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.05) 45%, rgba(0, 0, 0, 0.6)) border-box;
-  border: 1px solid transparent;
-  box-shadow:
-    0 18px 34px rgba(0, 0, 0, 0.5),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.6);
+  background: var(--surface-2);
+  border: 1.5px solid var(--ink);
+  box-shadow: none;
   transition: transform var(--t-press) var(--ease-out-soft),
-              box-shadow var(--t-control) var(--ease-out),
+              background-color var(--t-control) var(--ease-out),
               border-color var(--t-control) var(--ease-out);
 }
 
-/* 상단 스페큘러 캡 — 빛은 위에서 온다 */
+/* 도면의 면은 해칭이다. 그라디언트도 광택도 없다. */
 .choice::after {
   content: "";
   position: absolute;
-  inset: 1px 1px auto;
-  height: 34%;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.09), transparent);
+  inset: 3px;
+  background: repeating-linear-gradient(
+    -45deg, rgba(20, 20, 20, 0.055) 0 1px, transparent 1px 6px);
   pointer-events: none;
 }
 
 .choice .glyph {
-  font-family: var(--mono);
+  font-family: var(--serif);
   font-size: clamp(56px, 17vw, 92px);
-  font-weight: 700;
+  font-weight: 400;
   line-height: 1;
   color: var(--ink);
-  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.6);
   transition: color var(--t-control) var(--ease-out);
 }
 
-.choice:active { transform: translateY(1px); box-shadow: inset 0 5px 12px rgba(0, 0, 0, 0.6); }
+.choice:active { transform: translateY(1px); }
 
-/* 선택 상태 — 베리언트는 앰버 테두리 + 절제된 내부 글로우 */
+/* 선택 상태 — 제출 도장을 찍은 것처럼 겹테두리가 생긴다 */
 .choice[aria-pressed="true"] {
-  background:
-    linear-gradient(180deg, #2A2035, #1E1828 48%, #120E1C) padding-box,
-    linear-gradient(180deg, rgba(255, 180, 60, 0.85), rgba(255, 180, 60, 0.35) 50%, rgba(0, 0, 0, 0.5)) border-box;
-  box-shadow:
-    0 18px 34px rgba(0, 0, 0, 0.5),
-    inset 0 0 26px rgba(255, 180, 60, 0.22),
-    inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  border-color: var(--amber);
+  box-shadow: inset 0 0 0 3px var(--surface-2), inset 0 0 0 4.5px var(--amber);
 }
-
 .choice[aria-pressed="true"] .glyph { color: var(--amber); }
 
-/* 선택 순간의 버스트는 한 번만, 그 뒤엔 정적 선택 스타일로 남는다 */
-.choice.burst { animation: burst 900ms var(--ease-out-hard); }
+/* 접수 순간 한 번. 도장이 눌렸다 떨어지는 움직임이다. */
+.choice.burst { animation: burst 420ms var(--ease-out-hard); }
 
 @keyframes burst {
-  0% { box-shadow: 0 18px 34px rgba(0,0,0,.5), inset 0 0 0 rgba(255,180,60,0), 0 0 0 0 rgba(255,180,60,.5); }
-  30% { box-shadow: 0 18px 34px rgba(0,0,0,.5), inset 0 0 34px rgba(255,180,60,.34), 0 0 0 10px rgba(255,180,60,0); }
-  100% { box-shadow: 0 18px 34px rgba(0,0,0,.5), inset 0 0 26px rgba(255,180,60,.22), 0 0 0 0 rgba(255,180,60,0); }
+  0%   { transform: scale(1.03); }
+  40%  { transform: scale(0.985); }
+  100% { transform: scale(1); }
 }
 
+/* 등록 — 굵은 겹테두리. 거절 — 해칭으로 지운다. */
 .choice.correct {
-  background: linear-gradient(180deg, #163A2C, #0F2A20 48%, #08160F) padding-box,
-              linear-gradient(180deg, rgba(79, 192, 141, 0.9), rgba(79, 192, 141, 0.3)) border-box;
+  border-color: var(--ink);
+  border-width: 3px;
+  background: var(--surface-2);
 }
+.choice.correct .glyph { color: var(--ink); }
 
-.choice.correct .glyph { color: var(--live); }
-.choice.wrong { opacity: 0.32; }
+.choice.wrong { opacity: 1; border-color: var(--line-2); }
+.choice.wrong::after {
+  background: repeating-linear-gradient(
+    -45deg, rgba(20, 20, 20, 0.24) 0 1.5px, transparent 1.5px 7px);
+}
 .choice.wrong .glyph { color: var(--ink-3); }
 
 /* ─────────────────────────────────────────────── 정답 공개 */
@@ -806,6 +809,7 @@ body[data-demo="1"] .screen {
 }
 
 .evidence p { margin: 0; font-size: 14px; color: var(--ink-2); line-height: 1.6; }
+.evidence p { font-family: var(--serif); }
 .evidence .src { font-family: var(--mono); font-size: 11.5px; color: var(--ink-3); letter-spacing: 0.02em; }
 
 .cull {
@@ -910,6 +914,7 @@ body[data-demo="1"] .screen {
 .champ .crown { font-size: 34px; line-height: 1; }
 
 .champ .name {
+  font-family: var(--serif);
   font-size: clamp(30px, 9vw, 46px);
   font-weight: 700;
   letter-spacing: -0.03em;
@@ -954,3 +959,41 @@ body[data-demo="1"] .screen {
   .clock .colon { animation: none; }
   .dial .ring::after { animation: none; }
 }
+
+/* ── 엔딩 카드 ────────────────────────────────────────────────
+   우승 장면은 게임 화면 위에 겹치지 않고 화면을 통째로 덮는다.
+   섞으면 우승자가 UI에 얹힌 스티커처럼 보인다. */
+.ending {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: #FAF7F0;
+  cursor: pointer;
+}
+.ending[hidden] { display: none; }
+.ending canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* ── 문항 브리핑 구간 ─────────────────────────────────────────
+   중계가 문항을 소개하는 동안이다. 시계는 가득 찬 채 멈춰 있고 O·X는 잠겨 있다.
+   화면이 나레이션보다 앞서 달리지 않게 하는 장치다. */
+.arm-note {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: var(--ink-2);
+  text-align: center;
+  letter-spacing: -0.01em;
+}
+.arm-note::before { content: "( 57 ) "; font-family: var(--mono); color: var(--ink-3); }
+
+.choice.arming { opacity: 0.55; cursor: default; }
+.choice.arming::after {
+  background: repeating-linear-gradient(
+    -45deg, rgba(20, 20, 20, 0.10) 0 1px, transparent 1px 5px);
+}
+
+/* 브리핑 중 시계는 채워져 있되 대기 중임이 보여야 한다 */
+.timer.arming .fill { background: var(--line-2); }

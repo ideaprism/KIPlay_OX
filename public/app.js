@@ -20,6 +20,7 @@ const state = {
   snap: null,
   screen: 'login',
   answered: null,
+  arming: null,       // 브리핑 중인지. 바뀔 때만 버튼 상태를 손댄다.
   lastTickSec: null,
   es: null,
   retry: 0,
@@ -40,39 +41,125 @@ function initStages() {
   stages.watch = new CrowdStage($('watch-canvas'), { compact: true, zones: true });
   // 결과 화면의 옥상. O·X 발판은 필요 없다.
   stages.result = new CrowdStage($('result-canvas'), { compact: true, zones: false });
+  // 옥상 배경 사진. roofimage.js에서 켜기 전까지는 절차적 옥상이 쓰인다.
+  stages.result.setBackdrop(window.ROOF_BACKDROP_CONFIG);
   for (const s of Object.values(stages)) s.start();
 }
 
 const eachStage = (fn) => { for (const s of Object.values(stages)) if (s) fn(s); };
+
+// ═══════════════════════════════════════════════ 엔딩 카드
+//
+// 우승 장면은 결과 화면 안에 끼워 넣지 않고 화면을 통째로 덮었다가 걷힌다.
+
+let endingCard = null;
+let endingDone = false;
+
+function championColor(s, champ) {
+  const divs = (s.crowd && s.crowd.divisions) || (stages.result && stages.result.divisions) || [];
+  const byId = divs.find((d) => d.id === champ.div);
+  if (byId) return byId.color;
+  const st = stages.result;
+  const person = st && st.people && st.people[champ.ci];
+  if (person && divs[person.div]) return divs[person.div].color;
+  return null;
+}
+
+/**
+ * 공보 서지사항을 만든다.
+ *
+ * 등록번호는 회차와 이름에서 뽑아 매주 다르되 같은 회차에서는 늘 같게 나온다.
+ * 자리수는 실제 최근 등록번호(10-30xxxxx)에 맞췄다.
+ */
+function buildGazette(s, r) {
+  const ch = r.champion;
+  let hash = 0;
+  const seedStr = `${ch.name}${ch.dept}${r.totalPlayers}${(s.crowd && s.crowd.round) || 1}`;
+  for (let i = 0; i < seedStr.length; i += 1) hash = (hash * 31 + seedStr.charCodeAt(i)) >>> 0;
+
+  const d = new Date(s.serverNow || Date.now());
+  const yy = d.getFullYear();
+  const pubDate = `${yy}년${String(d.getMonth() + 1).padStart(2, '0')}월${String(d.getDate()).padStart(2, '0')}일`;
+  const runnerUp = (r.ranking && r.ranking[1] && r.ranking[1].name) || '원장실';
+
+  return {
+    regNo: `10-30${String(hash % 100000).padStart(5, '0')}`,
+    appNo: `10-${yy}-0${String(hash % 1000000).padStart(6, '0')}`,
+    pubDate,
+    examiner: runnerUp,
+    round: (s.crowd && s.crowd.round) || 1,
+  };
+}
+
+function playEnding(s) {
+  const r = s.result;
+  if (!r || !r.champion || endingDone) return;
+  if (!window.EndingCard || !$('ending')) return;
+  endingDone = true;
+  if (!endingCard) endingCard = new window.EndingCard($('ending'));
+  endingCard.show(Object.assign({
+    name: r.champion.name,
+    dept: r.champion.dept,
+    survived: r.champion.survived,
+    isNew: r.champion.isNew,
+    floor: r.floor,
+    totalPlayers: r.totalPlayers,
+  }, buildGazette(s, r)));
+}
 
 // ═══════════════════════════════════════════════ 중계
 
 const commentary = new Commentary();
 let captionTimer = null;
 const captionQueue = [];
+let lastSpokenPhase = null;
+const GAP_MS = 500;   // 문장 사이 한 박자
 
+/**
+ * 자막 한 줄을 띄우고 읽는다.
+ *
+ * 위상이 바뀌면 하던 말을 끊는다. 대기실 인사를 다 읽느라 첫 문항 소개가 뒤로 밀리면
+ * 화면은 이미 문제를 보여주는데 귀에서는 아직 대기실 이야기가 나온다. 그게 어긋남의 정체였다.
+ */
 function showCaption(line) {
   const el = $('caption');
   el.textContent = line.text;
   el.dataset.tone = line.tone || '';
   clearTimeout(captionTimer);
   captionTimer = setTimeout(() => { el.textContent = ''; el.dataset.tone = ''; }, 7000);
-  Sfx.say(line.say || line.text);
+  const turn = line.phase && line.phase !== lastSpokenPhase;
+  lastSpokenPhase = line.phase || lastSpokenPhase;
+  Sfx.say(line.say || line.text, { force: turn });
 }
 
 /** 여러 줄이 한꺼번에 나오면 읽히지 않는다. 간격을 두고 하나씩 흘린다. */
 function runCommentary(s) {
   const lines = commentary.update(s);
   if (!lines.length) return;
-  for (const line of lines) captionQueue.push(line);
+  for (const line of lines) captionQueue.push(Object.assign({ phase: s.phase }, line));
   if (captionQueue.length === lines.length) drainCaptions();
 }
 
+/**
+ * 자막을 한 줄씩 흘린다.
+ *
+ * 예전에는 고정 간격이었다. 그런데 한국어 한 문장은 3~4초가 걸리는데 간격이 2.8초라,
+ * 다음 줄이 앞줄을 밟고 올라서면서 중계가 계속 뒤로 밀렸다. 첫 문항이 뜰 때쯤이면
+ * 이미 몇 초가 밀려 있었다. 읽는 데 걸리는 시간만큼 기다린다.
+ *
+ * 위상이 지나간 대사는 버린다. 늦은 중계는 없느니만 못하다.
+ */
 function drainCaptions() {
   const line = captionQueue.shift();
   if (!line) return;
+  if (line.phase && state.snap && state.snap.phase !== line.phase) {
+    drainCaptions();   // 이미 지난 이야기다
+    return;
+  }
   showCaption(line);
-  if (captionQueue.length) setTimeout(drainCaptions, 2800);
+  if (captionQueue.length) {
+    setTimeout(drainCaptions, Sfx.estimate(line.say || line.text) + GAP_MS);
+  }
 }
 
 /** 선택 가리기 안내. 규칙이 바뀌었다는 걸 화면에 계속 남긴다. */
@@ -138,12 +225,21 @@ function startTimerLoop() {
     const remain = s.phaseEndsAt - now();
 
     if (s.phase === 'question') {
-      const ratio = Math.max(0, Math.min(1, remain / (s.questionMs || 10000)));
+      // 브리핑 구간에는 시계가 가득 찬 채 멈춰 있다. 중계가 문항을 소개하는 동안이다.
+      const arming = s.armAt && now() < s.armAt;
+      const ratio = arming ? 1 : Math.max(0, Math.min(1, remain / (s.questionMs || 10000)));
       $('q-timer-fill').style.transform = `scaleX(${ratio})`;
-      $('q-timer').classList.toggle('urgent', remain <= 3000);
+      $('q-timer').classList.toggle('urgent', !arming && remain <= 3000);
+      $('q-timer').classList.toggle('arming', !!arming);
+
+      // 브리핑이 끝나는 순간 버튼이 열린다
+      if (state.arming !== !!arming) {
+        state.arming = !!arming;
+        applyArmed(s);
+      }
 
       const sec = Math.ceil(remain / 1000);
-      if (remain > 0 && remain <= 3000 && sec !== state.lastTickSec) {
+      if (!arming && remain > 0 && remain <= 3000 && sec !== state.lastTickSec) {
         state.lastTickSec = sec;
         Sfx.tick();
       }
@@ -207,6 +303,7 @@ function render(s) {
 
   const phaseChanged = s.phase !== lastPhase;
   lastPhase = s.phase;
+  applyArmed(s);
 
   switch (s.phase) {
     case 'idle':
@@ -218,6 +315,8 @@ function render(s) {
       setScreen('lobby');
       $('lobby-countdown').textContent = fmtClock(s.phaseEndsAt - now());
       lastQIndex = -1;
+      endingDone = false;   // 다음 회차의 엔딩을 위해 되돌린다
+      if (endingCard) endingCard.finish();
       eachStage((st) => st.clearChampion());
       break;
 
@@ -241,6 +340,8 @@ function render(s) {
         $('q-diff-text').textContent = DIFF_KO[d] || d;
         resetChoices();
         setSendState('', '');
+        state.arming = null;   // 새 문항이면 다시 판정한다
+        applyArmed(s);
       }
       setScreen(me.alive ? 'question' : 'watch');
       break;
@@ -298,16 +399,17 @@ function render(s) {
       break;
     }
 
-    case 'result':
-      if (phaseChanged) {
-        renderResult(s, me);
-        // 챔피언은 몇 층에서 이겼든 마지막은 옥상이다
-        if (s.result && s.result.champion && s.result.champion.ci !== null) {
-          stages.result.setChampion(s.result.champion.ci);
-        }
-      }
+    case 'result': {
+      if (phaseChanged) renderResult(s, me);
+      // 챔피언은 몇 층에서 이겼든 마지막은 옥상이다.
+      // 결과 단계 내내 걸어둔다 — 중간에 새로고침하거나 늦게 붙은 사람도 그 장면을 봐야 한다.
+      const champ = s.result && s.result.champion;
+      if (champ && champ.ci !== null && champ.ci !== undefined) stages.result.setChampion(champ.ci);
+      else stages.result.clearChampion();
       setScreen('result');
+      playEnding(s);
       break;
+    }
   }
 
   // 관전 화면 공통값
@@ -328,6 +430,37 @@ function renderTally(s) {
   for (const id of ['bar-x', 'w-bar-x']) $(id).style.flexGrow = String(x / total);
   for (const id of ['num-o', 'w-num-o']) $(id).textContent = hidden ? '?' : o;
   for (const id of ['num-x', 'w-num-x']) $(id).textContent = hidden ? '?' : x;
+}
+
+/**
+ * 브리핑 중에는 O·X를 누를 수 없다.
+ *
+ * 서버도 armAt 전에는 접수하지 않으므로 여기서 막는 건 화면을 서버와 맞추는 일이다.
+ * 막아두지 않으면 눌러도 409만 돌아와서 먹통처럼 보인다.
+ */
+let armTimer = null;
+
+function applyArmed(s) {
+  const arming = !!(s && s.phase === 'question' && s.armAt && now() < s.armAt);
+  state.arming = arming;
+  const hint = $('q-arm-note');
+  if (hint) hint.hidden = !arming;
+
+  if (!state.answered) {
+    for (const b of [$('btn-o'), $('btn-x')]) {
+      b.disabled = arming;
+      b.classList.toggle('arming', arming);
+    }
+  }
+
+  // 여는 시각을 시계로 예약한다.
+  //
+  // 문항이 진행되는 동안 서버는 집계만 보내고 전체 상태를 다시 보내지 않는다. 그래서
+  // render()가 다시 불리지 않고, rAF 루프에만 맡기면 탭이 배경에 있는 사이 브리핑이
+  // 끝나도 버튼이 잠긴 채로 남는다. 실제로 그렇게 잠겨 있었다.
+  clearTimeout(armTimer);
+  armTimer = null;
+  if (arming) armTimer = setTimeout(() => applyArmed(state.snap), Math.max(0, s.armAt - now()) + 30);
 }
 
 function resetChoices() {
@@ -593,6 +726,30 @@ function bindChips(attr, key) {
 bindChips('role', 'role');
 bindChips('bots', 'bots');
 bindChips('lobby', 'lobby');
+
+/**
+ * 게임 설명 — 등록특허공보 양식의 이용안내를 창으로 띄운다.
+ *
+ * 경로를 상대로 둔다. 절대 주소(localhost:12055)로 박아두면 사내망이나 배포 환경에서 깨진다.
+ * 팝업 차단은 흔한 일이므로 막히면 같은 창에서 새 탭으로 연다.
+ */
+function openSpec() {
+  // 화면 크기를 못 읽는 환경이 있다. 그때 음수 좌표가 나오면 창이 화면 밖에서 열린다.
+  const sw = window.screen && window.screen.availWidth ? window.screen.availWidth : 1280;
+  const sh = window.screen && window.screen.availHeight ? window.screen.availHeight : 900;
+  const w = Math.min(960, Math.max(360, Math.round(sw * 0.62)));
+  const h = Math.min(1040, Math.max(480, Math.round(sh * 0.88)));
+  const left = Math.max(0, Math.round((sw - w) / 2));
+  const top = Math.max(0, Math.round((sh - h) / 2));
+  const win = window.open(
+    'spec.html', 'kipi1255spec',
+    `width=${w},height=${h},left=${left},top=${top},resizable=yes,scrollbars=yes`,
+  );
+  if (win) win.focus();
+  else window.open('spec.html', '_blank', 'noopener');   // 팝업이 막힌 경우
+}
+
+$('spec-open').addEventListener('click', openSpec);
 
 $('demo-open').addEventListener('click', () => {
   Sfx.unlock();

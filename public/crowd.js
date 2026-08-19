@@ -30,6 +30,27 @@
   const HOME_Y = 0.70;      // 군중 첫 줄
   const HOME_W = 0.42;      // 군중 폭
 
+  // ── 옥상 구도 (우승 장면 전용)
+  //
+  // 카메라는 챔피언의 등 뒤, 옥상 바닥 높이에 있다. 그래서 도시는 눈높이 아래에 깔리고
+  // 챔피언의 상반신만 그 위로 솟는다. 아래 네 값이 그 구도를 잡는다.
+  const ROOF_SKY = 0.26;    // 지평선 — 이 위는 하늘, 아래는 내려다보는 도시
+  const ROOF_EDGE = 0.70;   // 난간 윗면 — 여기서 도시가 끝나고 옥상이 시작된다
+  const ROOF_DECK = 0.78;   // 발을 딛는 바닥
+  const ROOF_STAND = 0.87;  // 챔피언이 서는 자리
+  const ROOF_R = 0.16;      // 챔피언 크기. 머리와 어깨가 난간선 위로 나오는 값이다.
+
+  /** 프레임마다 같은 스카이라인이 나와야 한다. 시드 고정 난수. */
+  function seeded(seed) {
+    let a = seed >>> 0;
+    return () => {
+      a = (a + 0x6D2B79F5) >>> 0;
+      let x = Math.imul(a ^ (a >>> 15), 1 | a);
+      x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x;
+      return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
   /**
    * 인원이 줄수록 사람이 커진다. 화면 높이에 대한 비율로 잡아 어떤 크기에서도 같게 보인다.
    *
@@ -50,70 +71,418 @@
     return 5;
   }
 
-  // ── 층 환경
-  const SCENES = {
-    lobby:      { sky: ['#1B2340', '#131A31'], plate: '#2E3860', edge: '#4A5788', label: '로비',   draw: drawLobby },
-    office:     { sky: ['#1A2138', '#12172A'], plate: '#2A3358', edge: '#44507E', label: '사무실', draw: drawOffice },
-    review:     { sky: ['#241A2A', '#17111E'], plate: '#3A2A44', edge: '#6B4670', label: '심사실', draw: drawReview },
-    archive:    { sky: ['#1E1A16', '#141110'], plate: '#382E26', edge: '#5C4834', label: '서고',   draw: drawArchive },
-    datacenter: { sky: ['#0E1A2C', '#08111F'], plate: '#16294A', edge: '#255076', label: '전산실', draw: drawDatacenter },
-    rooftop:    { sky: ['#3B2A46', '#8A4A38'], plate: '#241B36', edge: '#E08A45', label: '옥상',   draw: drawRooftop },
+  /* ── 공보 팔레트 ────────────────────────────────────────────
+   *
+   * 등록특허공보는 먹과 종이다. 색은 정보가 아니라 방해다.
+   *
+   * 단 하나의 강조색만 쓴다 —— 인주 빨강. 그것도 도장을 찍을 때만.
+   * 정답이 공개되는 순간에만 화면에 빨강이 등장하므로, 그 색이 곧 판정이 된다.
+   * 소속색은 윤곽선 안쪽을 아주 옅게 채우는 데만 쓴다. 주인공은 어디까지나 선이다.
+   */
+  const P = {
+    paper:  '#FAF7F0',   // 공보 용지
+    paper2: '#F2EEE4',   // 접힌 면, 표 바탕
+    ink:    '#141414',
+    mid:    '#5A5A5A',
+    light:  '#9A9A9A',
+    rule:   '#C8C2B6',   // 괘선
+    seal:   '#B03A2E',   // 인주. 이 파일에서 유일한 색.
   };
 
-  function drawLobby(c, w, h) {
-    c.fillStyle = 'rgba(120,150,220,.10)';
-    for (let i = 0; i < 5; i += 1) c.fillRect(w * (0.06 + i * 0.2), h * 0.30, w * 0.1, h * 0.30);
-  }
-  function drawOffice(c, w, h) {
-    c.fillStyle = 'rgba(200,220,255,.08)';
-    for (let i = 0; i < 7; i += 1) c.fillRect(w * (0.05 + i * 0.13), h * 0.34, w * 0.045, 4);
-    c.fillStyle = 'rgba(120,140,200,.06)';
-    for (let i = 0; i < 6; i += 1) c.fillRect(w * (0.09 + i * 0.14), h * 0.42, w * 0.07, h * 0.14);
-  }
-  function drawReview(c, w, h, t) {
-    const g = c.createRadialGradient(w / 2, h * 0.05, 10, w / 2, h * 0.05, h * 0.9);
-    g.addColorStop(0, 'rgba(230,120,140,.15)');
-    g.addColorStop(1, 'rgba(0,0,0,0)');
-    c.fillStyle = g; c.fillRect(0, 0, w, h);
-    c.fillStyle = `rgba(240,140,150,${0.05 + 0.03 * Math.sin(t / 700)})`;
-    c.fillRect(0, h * 0.04, w, 3);
-  }
-  function drawArchive(c, w, h) {
-    c.fillStyle = 'rgba(180,140,90,.08)';
-    for (let r = 0; r < 3; r += 1) {
-      const y = h * (0.34 + r * 0.09);
-      c.fillRect(0, y, w, 3);
-      for (let i = 0; i < 26; i += 1) {
-        if ((i * 7 + r * 3) % 5 === 0) continue;
-        c.fillRect(w * (i / 26) + 2, y - 12, w / 34, 12);
+  /** 소속색 — 채도를 눌러 선 아래에 깔린다 */
+  const DIV_TINT = ['#6B7B8C', '#6F8489', '#7E8F7A', '#8C8468', '#8C6F6F', '#7A6B8C'];
+
+  const px = (v) => Math.round(v) + 0.5;   // 선을 픽셀 격자에 앉혀 흐려지지 않게 한다
+
+  /**
+   * 사선 해칭. 도면에서 면을 채우는 유일한 방법이다.
+   * 명암을 쓰지 않고 선 간격만으로 농도를 만든다 —— 인쇄를 전제한 그림의 문법이다.
+   */
+  function hatch(c, x0, y0, w, h, gap, alpha, dir) {
+    if (w <= 0 || h <= 0) return;
+    c.save();
+    c.beginPath();
+    c.rect(x0, y0, w, h);
+    c.clip();
+    c.strokeStyle = `rgba(20,20,20,${alpha})`;
+    c.lineWidth = 0.6;
+    c.beginPath();
+    if (dir === -1) {
+      for (let i = -h; i < w + h; i += gap) {
+        c.moveTo(x0 + i, y0);
+        c.lineTo(x0 + i + h, y0 + h);
+      }
+    } else {
+      for (let i = -h; i < w + h; i += gap) {
+        c.moveTo(x0 + i, y0 + h);
+        c.lineTo(x0 + i + h, y0);
       }
     }
+    c.stroke();
+    c.restore();
   }
+
+  /**
+   * 인출선과 부호. 도면의 문법 그 자체다.
+   * 가리키는 점에 작은 원, 거기서 뻗은 선, 끝에 숫자.
+   */
+  function callout(c, num, tx, ty, lx, ly, size) {
+    c.strokeStyle = P.ink;
+    c.lineWidth = 0.8;
+    c.beginPath();
+    c.moveTo(px(tx), px(ty));
+    c.lineTo(px(lx), px(ly));
+    c.stroke();
+    c.fillStyle = P.ink;
+    c.beginPath();
+    c.arc(tx, ty, Math.max(1.2, size * 0.16), 0, 6.283);
+    c.fill();
+    c.font = `500 ${size}px ui-monospace, monospace`;
+    c.textAlign = lx > tx ? 'left' : 'right';
+    c.textBaseline = 'middle';
+    c.fillText(num, lx + (lx > tx ? size * 0.4 : -size * 0.4), ly);
+  }
+
+  /**
+   * 도장. 등록이면 원, 거절이면 사선.
+   *
+   * 이 게임에서 색이 등장하는 유일한 순간이다. 정답이 공개될 때만 인주가 찍힌다.
+   */
+  function seal(c, cx, cy, r, text, t) {
+    // 찍히는 순간 살짝 커졌다 제자리로 —— 도장은 눌렸다 떨어진다
+    const pop = t === undefined ? 1 : 1 + 0.12 * Math.exp(-t / 160);
+    const rr = r * pop;
+    c.save();
+    c.translate(cx, cy);
+    c.rotate(-0.12);
+    c.strokeStyle = P.seal;
+    c.lineWidth = Math.max(1.5, r * 0.11);
+    c.beginPath();
+    c.arc(0, 0, rr, 0, 6.283);
+    c.stroke();
+    c.beginPath();
+    c.arc(0, 0, rr * 0.82, 0, 6.283);
+    c.lineWidth = Math.max(1, r * 0.05);
+    c.stroke();
+    c.fillStyle = P.seal;
+    c.font = `700 ${Math.round(rr * 0.52)}px "Nanum Myeongjo", Batang, 바탕, serif`;
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    c.fillText(text, 0, rr * 0.04);
+    c.restore();
+  }
+
+  // ── 층 환경. 각 층이 도면 한 장이다.
+  const SCENES = {
+    lobby:      { no: 1, label: '로비',   caption: '입장 상태도',       draw: drawLobby },
+    office:     { no: 2, label: '사무실', caption: '응답 이동 상태도',  draw: drawOffice },
+    review:     { no: 3, label: '심사실', caption: '심사 단계 상태도',  draw: drawReview },
+    archive:    { no: 4, label: '서고',   caption: '문헌 열람 상태도',  draw: drawArchive },
+    datacenter: { no: 5, label: '전산실', caption: '연산 처리 상태도',  draw: drawDatacenter },
+    rooftop:    { no: 6, label: '옥상',   caption: '우승자 옥상 사시도', draw: drawRooftop },
+  };
+
+  /* 바닥선. 사람이 허공이 아니라 방 안에 서게 만든다. */
+  const FLOOR_Y = 0.62;
+
+  /** 바닥면. 도면에서 평면은 원근선 몇 줄이면 충분하다. */
+  function drawFloorPlane(c, w, h) {
+    const fy = Math.round(h * FLOOR_Y);
+    c.strokeStyle = P.ink;
+    c.lineWidth = 1;
+    c.beginPath();
+    c.moveTo(px(0), px(fy));
+    c.lineTo(px(w), px(fy));
+    c.stroke();
+
+    // 소실점으로 모이는 바닥선
+    c.strokeStyle = 'rgba(20,20,20,.16)';
+    c.lineWidth = 0.6;
+    c.beginPath();
+    for (let i = 0; i <= 10; i += 1) {
+      const bx = (w * i) / 10;
+      c.moveTo(px(lerp(w / 2, bx, 0.30)), px(fy));
+      c.lineTo(px(bx), px(h));
+    }
+    c.stroke();
+  }
+
+  function drawLobby(c, w, h) {
+    // 유리벽. 창틀은 실선, 유리는 해칭.
+    c.strokeStyle = P.ink;
+    c.lineWidth = 1;
+    for (let i = 0; i < 5; i += 1) {
+      const x = Math.round(w * (0.06 + i * 0.2));
+      const y = Math.round(h * 0.20);
+      const bw = Math.round(w * 0.10);
+      const bh = Math.round(h * 0.36);
+      c.strokeRect(px(x), px(y), bw, bh);
+      hatch(c, x + 1, y + 1, bw - 2, bh - 2, 7, 0.10, 1);
+    }
+    drawFloorPlane(c, w, h);
+  }
+
+  function drawOffice(c, w, h) {
+    // 천장 조명
+    c.strokeStyle = P.mid;
+    c.lineWidth = 1;
+    c.beginPath();
+    for (let i = 0; i < 7; i += 1) {
+      const x = Math.round(w * (0.05 + i * 0.13));
+      c.moveTo(px(x), px(h * 0.14));
+      c.lineTo(px(x + w * 0.05), px(h * 0.14));
+    }
+    c.stroke();
+    // 파티션. 위에서 본 칸막이라 해칭으로 면을 표시한다.
+    c.strokeStyle = P.ink;
+    for (let i = 0; i < 6; i += 1) {
+      const x = Math.round(w * (0.09 + i * 0.14));
+      const y = Math.round(h * 0.38);
+      const bw = Math.round(w * 0.07);
+      const bh = Math.round(h * 0.22);
+      c.strokeRect(px(x), px(y), bw, bh);
+      hatch(c, x + 1, y + 1, bw - 2, bh - 2, 5, 0.16, 1);
+    }
+    drawFloorPlane(c, w, h);
+  }
+
+  function drawReview(c, w, h, t) {
+    // 위에서 떨어지는 심문등. 사다리꼴 광선을 선으로만 그린다.
+    c.strokeStyle = 'rgba(20,20,20,.35)';
+    c.lineWidth = 0.8;
+    c.beginPath();
+    c.moveTo(px(w * 0.42), px(h * 0.05));
+    c.lineTo(px(w * 0.16), px(h * FLOOR_Y));
+    c.moveTo(px(w * 0.58), px(h * 0.05));
+    c.lineTo(px(w * 0.84), px(h * FLOOR_Y));
+    c.stroke();
+    hatch(c, w * 0.16, h * 0.05, w * 0.68, h * (FLOOR_Y - 0.05), 14, 0.06, 1);
+
+    // 등. 깜빡임은 선 굵기로 표현한다.
+    c.strokeStyle = P.ink;
+    c.lineWidth = Math.sin(t / 700) > -0.2 ? 2.2 : 1;
+    c.beginPath();
+    c.moveTo(px(w * 0.42), px(h * 0.05));
+    c.lineTo(px(w * 0.58), px(h * 0.05));
+    c.stroke();
+    drawFloorPlane(c, w, h);
+  }
+
+  function drawArchive(c, w, h) {
+    c.strokeStyle = P.ink;
+    c.lineWidth = 1;
+    for (let r = 0; r < 3; r += 1) {
+      const y = Math.round(h * (0.24 + r * 0.12));
+      const bh = Math.max(4, Math.round(h * 0.08));
+      c.beginPath();
+      c.moveTo(px(0), px(y));
+      c.lineTo(px(w), px(y));
+      c.stroke();
+      // 책등. 문헌이 꽂힌 서가다.
+      c.lineWidth = 0.7;
+      c.beginPath();
+      for (let i = 0; i < 30; i += 1) {
+        if ((i * 7 + r * 3) % 5 === 0) continue;
+        const bx = Math.round(w * (i / 30)) + 2;
+        c.moveTo(px(bx), px(y - bh));
+        c.lineTo(px(bx), px(y));
+      }
+      c.stroke();
+      c.lineWidth = 1;
+    }
+    drawFloorPlane(c, w, h);
+  }
+
   function drawDatacenter(c, w, h, t) {
-    c.fillStyle = 'rgba(40,90,150,.15)';
-    for (let i = 0; i < 8; i += 1) c.fillRect(w * (0.04 + i * 0.12), h * 0.30, w * 0.07, h * 0.28);
     for (let i = 0; i < 8; i += 1) {
+      const rx = Math.round(w * (0.04 + i * 0.12));
+      const rw = Math.round(w * 0.07);
+      const ry = Math.round(h * 0.20);
+      const rh = Math.round(h * 0.40);
+      c.strokeStyle = P.ink;
+      c.lineWidth = 1;
+      c.strokeRect(px(rx), px(ry), rw, rh);
+      // 표시등. 켜지면 채워지고 꺼지면 빈 원이다.
       for (let j = 0; j < 5; j += 1) {
         const on = (Math.sin(t / 300 + i * 1.7 + j * 0.9) + 1) / 2 > 0.55;
-        c.fillStyle = on ? 'rgba(90,200,230,.7)' : 'rgba(90,200,230,.14)';
-        c.fillRect(w * (0.05 + i * 0.12), h * (0.33 + j * 0.05), 5, 3);
+        const cy = Math.round(h * (0.24 + j * 0.07));
+        const cx2 = rx + rw * 0.5;
+        const rr = Math.max(1.2, rw * 0.09);
+        c.beginPath();
+        c.arc(cx2, cy, rr, 0, 6.283);
+        if (on) { c.fillStyle = P.ink; c.fill(); } else { c.lineWidth = 0.7; c.stroke(); }
       }
     }
+    drawFloorPlane(c, w, h);
   }
-  function drawRooftop(c, w, h, t) {
-    c.fillStyle = 'rgba(20,14,34,.85)';
-    let x = 0; let seed = 7;
-    while (x < w) {
-      seed = (seed * 1103515245 + 12345) % 2147483648;
-      const bw = 26 + (seed % 60);
-      const bh = h * (0.14 + ((seed >> 7) % 100) / 420);
-      c.fillRect(x, h * 0.58 - bh, bw, bh + 10);
-      c.fillStyle = 'rgba(255,190,120,.45)';
-      for (let i = 0; i < 4; i += 1) {
-        if ((Math.sin(t / 1600 + x + i * 2.3) + 1) / 2 > 0.45) c.fillRect(x + 5 + (i % 3) * 8, h * 0.58 - bh + 10 + i * 12, 3, 4);
+
+  /**
+   * 사진 위에 얹는 생기.
+   *
+   * 정지 사진은 4주만 지나도 닳는다. 창 몇 개가 아주 느리게 켜지고 꺼지는 것만으로
+   * 도시가 살아 있게 보인다. 사진에 이미 디테일이 있으니 여기서는 세게 넣지 않는다.
+   */
+  function drawRoofLife(c, w, h, t) {
+    const top = h * ROOF_SKY;
+    const span = h * (ROOF_EDGE - ROOF_SKY);
+    let seed = 20250819;
+    const rnd = () => {
+      seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+      return seed / 0x7fffffff;
+    };
+
+    c.fillStyle = P.ink;
+    for (let i = 0; i < 26; i += 1) {
+      const x = rnd() * w;
+      // 아래쪽(가까운 건물)에 더 많이 몰리게 한다
+      const y = top + span * Math.pow(rnd(), 0.6);
+      const ph = rnd() * 6.283;
+      if ((Math.sin(t / 1100 + ph) + 1) / 2 < 0.55) continue;
+      c.fillRect(Math.round(x), Math.round(y), Math.max(1, w * 0.0022), Math.max(1, h * 0.006));
+    }
+
+    // 항공장애등. 도면에서 유일하게 인주가 찍히는 자리다.
+    if (Math.sin(t / 620) > 0) {
+      c.fillStyle = P.seal;
+      c.beginPath();
+      c.arc(w * 0.085, h * (ROOF_EDGE - 0.16), Math.max(1.5, h * 0.007), 0, 6.283);
+      c.fill();
+    }
+  }
+
+  /**
+   * 옥상 — 우승 장면.
+   *
+   * 이 그림에서 유일하게 중요한 건 시점이다. 도시를 눈높이에 두면 길에 서 있는 그림이 되고,
+   * 눈높이 아래로 내려야 비로소 내려다보는 그림이 된다. 그래서 지평선을 화면 위쪽(ROOF_SKY)에
+   * 붙이고, 건물은 전부 그 아래에 깔되 앞으로 올수록 크고 어둡게 그린다. 난간(ROOF_EDGE)이
+   * 도시와 옥상을 가르고, 그 아래가 챔피언이 딛고 선 바닥이다.
+   */
+  function drawRooftop(c, w, h, t, stage) {
+    // 사진 배경이 준비돼 있으면 그것이 하늘·도시·난간·바닥을 전부 대신한다.
+    // 없으면 아래의 절차적 옥상이 그대로 그려진다. 이미지는 선택이지 전제가 아니다.
+    const bd = stage && stage.backdrop;
+    if (bd && bd.ready() && bd.build(w, h, ROOF_EDGE)) {
+      bd.draw(c, w, h);
+      if (bd.life) drawRoofLife(c, w, h, t);
+      return;
+    }
+
+    const horizon = h * ROOF_SKY;
+    const edge = h * ROOF_EDGE;
+    const deck = h * ROOF_DECK;
+    const sunX = w * 0.68;
+
+    // ── 해. 도면에서 광원은 동심원 몇 개로 표시한다.
+    c.strokeStyle = P.light;
+    c.lineWidth = 0.7;
+    for (let i = 1; i <= 4; i += 1) {
+      c.beginPath();
+      c.arc(sunX, horizon - h * 0.02, h * 0.045 + i * h * 0.028, Math.PI, 0);
+      c.stroke();
+    }
+    c.strokeStyle = P.ink;
+    c.lineWidth = 1;
+    c.beginPath();
+    c.arc(sunX, horizon - h * 0.02, h * 0.045, 0, 6.283);
+    c.stroke();
+
+    /**
+     * 건물 한 띠. 선화라 채우지 않고 윤곽만 그린다.
+     * 거리는 명암이 아니라 선 굵기와 해칭 밀도로 만든다 —— 흑백 인쇄의 원근법이다.
+     */
+    const band = (seed, base, minH, maxH, minW, maxW, lw, hatchA, win) => {
+      const rnd = seeded(seed);
+      let x = -maxW * rnd();
+      c.lineWidth = lw;
+      c.strokeStyle = P.ink;
+      while (x < w) {
+        const bw = Math.max(3, minW + (maxW - minW) * rnd());
+        const bh = Math.max(3, minH + (maxH - minH) * rnd());
+        const top = base - bh;
+        c.fillStyle = P.paper;
+        c.fillRect(px(x), px(top), Math.round(bw), Math.round(base - top));
+        c.strokeRect(px(x), px(top), Math.round(bw), Math.round(base - top));
+
+        // 옥탑의 물탱크나 계단실
+        if (rnd() > 0.62 && bw > 8) {
+          const cw = bw * 0.3;
+          const ch = bh * 0.16;
+          c.fillStyle = P.paper;
+          c.fillRect(px(x + bw * 0.25), px(top - ch), Math.round(cw), Math.round(ch));
+          c.strokeRect(px(x + bw * 0.25), px(top - ch), Math.round(cw), Math.round(ch));
+        }
+        if (hatchA > 0) hatch(c, x + 1, top + 1, bw - 2, bh - 2, 6, hatchA, 1);
+
+        // 창. 도면에서는 작은 사각형 격자다.
+        if (win && bw > 14) {
+          c.lineWidth = 0.5;
+          for (let i = 4; i < bw - 5; i += 7) {
+            for (let j = 5; j < bh - 4; j += 9) {
+              if (rnd() > 0.5) continue;
+              c.strokeRect(px(x + i), px(top + j), 3, 4);
+            }
+          }
+          c.lineWidth = lw;
+        }
+        x += bw + 2 + rnd() * (maxW * 0.28);
       }
-      c.fillStyle = 'rgba(20,14,34,.85)';
-      x += bw + 8;
+    };
+
+    // ── 먼 스카이라인 → 중간 블록 → 발밑의 도시. 앞으로 올수록 굵고 진하다.
+    band(11, horizon + h * 0.10, h * 0.03, h * 0.09, w * 0.010, w * 0.030, 0.5, 0, false);
+    band(29, horizon + h * 0.24, h * 0.05, h * 0.14, w * 0.016, w * 0.045, 0.75, 0.10, false);
+    band(47, edge, h * 0.08, h * 0.20, w * 0.028, w * 0.075, 1.1, 0.18, true);
+
+    // ── 난간. 이 선이 도시와 옥상을 가른다.
+    c.fillStyle = P.paper;
+    c.fillRect(0, Math.round(edge), w, Math.round(h - edge));
+    c.strokeStyle = P.ink;
+    c.lineWidth = 1.8;
+    c.beginPath();
+    c.moveTo(px(0), px(edge));
+    c.lineTo(px(w), px(edge));
+    c.stroke();
+    c.lineWidth = 0.9;
+    c.beginPath();
+    c.moveTo(px(0), px(deck));
+    c.lineTo(px(w), px(deck));
+    c.stroke();
+    // 난간 안쪽 면 —— 해칭으로 '세워진 면'임을 표시한다
+    hatch(c, 0, edge + 1, w, deck - edge - 1, 7, 0.30, 1);
+
+    // 옥상 바닥. 원근선이 소실점으로 모인다.
+    c.strokeStyle = 'rgba(20,20,20,.16)';
+    c.lineWidth = 0.6;
+    c.beginPath();
+    for (let i = 0; i <= 10; i += 1) {
+      const bx = (w * i) / 10;
+      c.moveTo(px(lerp(w / 2, bx, 0.35)), px(deck));
+      c.lineTo(px(bx), px(h));
+    }
+    c.stroke();
+
+    // 환기구와 안테나. 여기가 '건물 옥상'이지 그냥 바닥이 아니라는 표시.
+    c.strokeStyle = P.ink;
+    c.lineWidth = 1;
+    const vw = Math.max(6, w * 0.05);
+    const vh = Math.max(6, (h - edge) * 0.34);
+    c.fillStyle = P.paper;
+    c.fillRect(px(w * 0.06), px(edge - vh), Math.round(vw), Math.round(vh));
+    c.strokeRect(px(w * 0.06), px(edge - vh), Math.round(vw), Math.round(vh));
+    hatch(c, w * 0.06 + 1, edge - vh + 1, vw - 2, vh - 2, 5, 0.22, -1);
+    c.fillRect(px(w * 0.885), px(edge - vh * 0.7), Math.round(vw * 0.7), Math.round(vh * 0.7));
+    c.strokeRect(px(w * 0.885), px(edge - vh * 0.7), Math.round(vw * 0.7), Math.round(vh * 0.7));
+    c.beginPath();
+    c.moveTo(px(w * 0.085), px(edge - vh));
+    c.lineTo(px(w * 0.085), px(edge - vh * 2.1));
+    c.stroke();
+    // 항공장애등. 도면에서 유일하게 인주가 찍히는 자리다.
+    if (Math.sin(t / 620) > 0) {
+      c.fillStyle = P.seal;
+      c.beginPath();
+      c.arc(w * 0.085, edge - vh * 2.1, Math.max(1.5, h * 0.009), 0, 6.283);
+      c.fill();
     }
   }
 
@@ -122,7 +491,10 @@
   class CrowdStage {
     constructor(canvas, opts = {}) {
       this.canvas = canvas;
-      this.ctx = canvas.getContext('2d', { alpha: false });
+      // 캔버스를 불투명(alpha:false)으로 잡으면 크롬이 글자에 LCD 서브픽셀 안티앨리어싱을
+      // 쓴다. 그러면 검은 글자 가장자리에 주황·보라 색테가 생긴다. 컬러 화면에서는 안 보이지만
+      // 먹과 종이만 쓰는 도면에서는 그 색테가 그대로 눈에 띈다. alpha:true면 회색조로 떨어진다.
+      this.ctx = canvas.getContext('2d', { alpha: true });
       this.compact = !!opts.compact;
       this.showZones = opts.zones !== false;
 
@@ -135,11 +507,15 @@
       this.scene = 'lobby';
       this.prevScene = null;
       this.sceneT = 1;
+      this.floorScene = 'lobby';   // 옥상에 올라가기 직전의 층. 우승 장면이 끝나면 여기로 돌아온다.
+      this.backdrop = null;        // 옥상 배경 사진. 없으면 절차적으로 그린다.
+      this.roofStand = ROOF_STAND; // 사진이 난간선을 다르게 선언하면 여기가 따라 움직인다.
       this.alive = 0;
       this.named = null;
       this.myIndex = null;
 
       this.revealSide = null;
+      this.sealAt = null;          // 도장이 찍힌 시각. 눌렸다 떨어지는 맛을 위해 잰다.
       this.championIndex = null;   // 우승 장면 — 이 사람만 옥상에 크게 남는다
       this.riseT = 1;
       this.t0 = performance.now();
@@ -162,6 +538,13 @@
       if (this._ro) { this._ro.disconnect(); this._ro = null; }
     }
 
+    /**
+     * 선화는 저해상도 버퍼를 쓰지 않는다.
+     *
+     * 픽셀아트였을 때는 일부러 해상도를 낮추고 정수배로 확대했지만, 도면은 정반대다.
+     * 가는 선 한 줄이 정확히 1px로 앉아야 인쇄물처럼 보인다. 그래서 화면 해상도 그대로
+     * 그리고, 좌표는 px() 로 반 픽셀 격자에 맞춘다.
+     */
     resize() {
       const r = this.canvas.getBoundingClientRect();
       this.dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -169,7 +552,21 @@
       this.canvas.height = Math.max(1, Math.round(r.height * this.dpr));
       this.w = r.width;
       this.h = r.height;
+
+      // 비율이 바뀌면 다른 원본이 필요할 수 있다. 세로 화면에 가로 사진을 쓰면
+      // 도시가 다 잘려나간다.
+      if (this.backdrop) this.pickBackdropSource();
       this.layout();
+    }
+
+    pickBackdropSource() {
+      const bd = this.backdrop;
+      bd.load(this.w / Math.max(1, this.h)).then((ok) => {
+        if (!ok || this.backdrop !== bd) return;
+        const stand = bd.stand();
+        if (typeof stand === 'number') this.roofStand = stand;
+        this.layout();
+      });
     }
 
     // ── 데이터 ────────────────────────────────────────────────
@@ -202,10 +599,11 @@
 
       // ?scene= 픽스처로 층을 고정한 상태면 서버 값으로 덮어쓰지 않는다
       if (!this.sceneLocked) {
-        if (s.scene && s.scene !== this.scene) {
-          this.prevScene = this.scene;
-          this.scene = s.scene;
-          this.sceneT = 0;
+        if (s.scene) {
+          this.floorScene = s.scene;
+          // 결과 단계에도 서버는 마지막 층 배경을 계속 보낸다. 우승 장면이 떠 있는 동안
+          // 그걸 그대로 받으면 옥상이 매 틱 층 배경으로 되돌아간다.
+          if (this.championIndex === null) this.toScene(s.scene);
         }
         if (typeof s.floor === 'number' && s.floor !== this.floor) {
           this.floor = s.floor;
@@ -225,20 +623,48 @@
     setMyIndex(i) { this.myIndex = i; }
 
     /**
+     * 옥상 배경 사진을 건다. 없으면 절차적 옥상이 그대로 쓰인다.
+     * 원본이 선언한 난간선(edge)에 맞춰 우승자가 설 자리도 따라 움직인다.
+     */
+    setBackdrop(cfg) {
+      if (!global.RoofBackdrop || !cfg || cfg.enabled === false) return;
+      this.backdrop = new global.RoofBackdrop(cfg);
+      this.pickBackdropSource();
+    }
+
+    /** 장면 전환. 넘어오는 동안만 이전 장면이 남고, 끝나면 새 장면만 그린다. */
+    toScene(name) {
+      if (!name || !SCENES[name] || name === this.scene) return;
+      this.prevScene = this.scene;
+      this.scene = name;
+      this.sceneT = 0;
+    }
+
+    /**
      * 우승 장면. 챔피언 혼자 옥상에 서서 도시를 내려다본다.
      * 몇 층에서 이겼든 마지막은 옥상이다.
+     *
+     * 결과 단계 내내 매 틱 불릴 수 있으므로 같은 값이면 아무것도 하지 않는다.
+     * 그러지 않으면 전환이 계속 처음부터 다시 시작돼 장면이 영영 도착하지 못한다.
      */
     setChampion(ci) {
-      this.championIndex = typeof ci === 'number' ? ci : null;
-      if (this.championIndex !== null && !this.sceneLocked) {
-        this.prevScene = this.scene;
-        this.scene = 'rooftop';
-        this.sceneT = 0;
+      const next = typeof ci === 'number' ? ci : null;
+      if (next === this.championIndex) return;
+      this.championIndex = next;
+      if (next !== null && !this.sceneLocked) {
+        if (this.scene !== 'rooftop') this.floorScene = this.scene;
+        this.toScene('rooftop');
       }
       this.layout();
     }
 
-    clearChampion() { this.championIndex = null; }
+    clearChampion() {
+      if (this.championIndex === null) return;
+      this.championIndex = null;
+      // 다음 회차는 옥상에서 시작하지 않는다. 올라오기 전 층으로 돌려놓는다.
+      if (!this.sceneLocked && this.scene === 'rooftop') this.toScene(this.floorScene || 'lobby');
+      this.layout();
+    }
 
     applyAlive(mask) {
       for (let i = 0; i < this.people.length && i < mask.length; i += 1) {
@@ -290,12 +716,14 @@
       const r = radiusFor(this.alive || this.n, H, this.compact ? 0.032 : 0.020);
       const gap = r * 2.7;
 
-      // 우승 장면 — 챔피언만 무대 중앙에 서고 나머지는 아래로 물러난다
+      // 우승 장면 — 챔피언만 옥상 바닥에 서고 나머지는 아래로 물러난다.
+      // 발은 난간 안쪽(ROOF_STAND)에 두되 상반신은 난간선 위로 올라가야 한다.
+      // 그래야 도시를 등지고 내려다보는 그림이 된다.
       if (this.championIndex !== null) {
         for (const p of this.people) {
           if (p.i === this.championIndex) {
             p.tx = W / 2;
-            p.ty = H * 0.72;
+            p.ty = this.scene === 'rooftop' ? H * this.roofStand : H * 0.72;
           } else {
             p.ty = H * 1.4;
             p.alive = false;
@@ -358,7 +786,10 @@
 
     update() {
       if (this.riseT < 1) this.riseT = Math.min(1, this.riseT + 0.018);
-      if (this.sceneT < 1) this.sceneT = Math.min(1, this.sceneT + 0.02);
+      if (this.sceneT < 1) {
+        this.sceneT = Math.min(1, this.sceneT + 0.02);
+        if (this.sceneT >= 1) this.prevScene = null;   // 다 넘어왔으면 이전 장면은 버린다
+      }
 
       for (const p of this.people) {
         // 달려가는 속도. 멀수록 빨리 움직여 모두 비슷한 시간에 도착한다.
@@ -370,62 +801,105 @@
     }
 
     draw(now) {
-      const c = this.ctx;
       const t = now - this.t0;
       const W = this.w;
       const H = this.h;
       if (W < 8 || H < 8) return;
 
+      const c = this.ctx;
       c.save();
       c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
 
       const sc = SCENES[this.scene] || SCENES.lobby;
+      const from = this.sceneT < 1 ? SCENES[this.prevScene] : null;
 
-      // 배경 — 층이 바뀌면 이전 장면에서 넘어온다
-      this.paintScene(c, SCENES[this.prevScene] || sc, W, H, t);
-      if (this.sceneT < 1) {
+      // 배경 — 넘어오는 동안에만 이전 장면을 깔고 그 위로 새 장면을 띄운다.
+      // 바닥에 깔아야 하는 건 어디까지나 '지금' 장면이다.
+      if (from) {
+        this.paintScene(c, from, W, H, t);
         c.globalAlpha = this.sceneT;
         this.paintScene(c, sc, W, H, t);
         c.globalAlpha = 1;
+      } else {
+        this.paintScene(c, sc, W, H, t);
       }
 
-      if (this.showZones) this.drawZones(c, W, H, sc);
+      // 우승 장면에는 O·X 발판이 없다. 게임은 이미 끝났다.
+      const champScene = this.championIndex !== null;
+      if (this.showZones && !champScene) this.drawZones(c, W, H, sc);
       this.drawPeople(c, t);
-      if (this.showZones) this.drawFloorTag(c, W, H, sc);
+      if (this.showZones) this.drawFloorTag(c, W, H, sc, champScene);
 
       c.restore();
     }
 
+    /** 도면 한 장. 용지를 깔고 테두리를 두른 뒤 그림을 그린다. */
     paintScene(c, sc, W, H, t) {
-      const g = c.createLinearGradient(0, 0, 0, H);
-      g.addColorStop(0, sc.sky[0]);
-      g.addColorStop(1, sc.sky[1]);
-      c.fillStyle = g;
+      c.fillStyle = P.paper;
       c.fillRect(0, 0, W, H);
-      sc.draw(c, W, H, t);
+
+      // 도면 테두리 두 겹. 바깥은 옅고 안쪽이 실선이다.
+      const m = Math.max(5, Math.round(Math.min(W, H) * 0.022));
+      c.strokeStyle = P.rule;
+      c.lineWidth = 1;
+      c.strokeRect(px(m * 0.55), px(m * 0.55), Math.round(W - m * 1.1), Math.round(H - m * 1.1));
+      c.strokeStyle = P.ink;
+      c.lineWidth = 0.9;
+      c.strokeRect(px(m), px(m), Math.round(W - m * 2), Math.round(H - m * 2));
+
+      sc.draw(c, W, H, t, this);
     }
 
-    /** 위쪽 O / X 발판 */
+    /**
+     * O / X 발판.
+     *
+     * 정답이 공개되면 색이 아니라 판정이 찍힌다 —— 맞은 쪽에는 등록 도장, 틀린 쪽에는
+     * 거절 사선. 이 게임에서 인주가 등장하는 유일한 순간이고, 그래서 그 색이 곧 결과다.
+     */
     drawZones(c, W, H, sc) {
       const y = H * ZONE_Y;
       const w = W * ZONE_W;
-      const th = Math.max(4, H * 0.014);
+      const th = Math.max(3, H * 0.012);
+
+      // 도장이 언제 찍혔는지 —— 눌렸다 떨어지는 맛을 주려고 잰다
+      if (this.revealSide && this.sealAt === null) this.sealAt = performance.now();
+      if (!this.revealSide) this.sealAt = null;
+      const since = this.sealAt === null ? undefined : performance.now() - this.sealAt;
 
       for (const side of ['O', 'X']) {
         const cx = W * (side === 'O' ? ZONE_CX_O : ZONE_CX_X);
         const hit = this.revealSide === side;
         const miss = this.revealSide && !hit;
+        const bx = cx - w / 2;
 
-        c.fillStyle = miss ? 'rgba(240,115,106,.22)' : hit ? 'rgba(79,192,141,.30)' : sc.plate;
-        c.fillRect(cx - w / 2, y, w, th);
-        c.fillStyle = miss ? 'rgba(240,115,106,.5)' : hit ? '#4FC08D' : sc.edge;
-        c.fillRect(cx - w / 2, y, w, Math.max(2, th * 0.3));
+        // 발판. 부호가 붙는 도면 요소다.
+        c.strokeStyle = P.ink;
+        c.lineWidth = 1.4;
+        c.beginPath();
+        c.moveTo(px(bx), px(y));
+        c.lineTo(px(bx + w), px(y));
+        c.stroke();
+        hatch(c, bx, y, w, th, 5, miss ? 0.14 : 0.42, 1);
 
+        // 글자는 발판 위에 크게. 사람이 발판 아래에 서므로 가려지지 않는다.
         c.textAlign = 'center';
         c.textBaseline = 'alphabetic';
-        c.font = `700 ${Math.round(clamp(H * 0.13, 20, 96))}px ui-monospace, monospace`;
-        c.fillStyle = miss ? 'rgba(240,115,106,.4)' : hit ? '#4FC08D' : 'rgba(255,255,255,.30)';
-        c.fillText(side, cx, y - H * 0.02);
+        c.font = `400 ${Math.round(clamp(H * 0.17, 12, 76))}px "Nanum Myeongjo", Batang, 바탕, serif`;
+        c.fillStyle = miss ? 'rgba(20,20,20,.22)' : P.ink;
+        c.fillText(side, cx, y - H * 0.035);
+
+        if (miss) {
+          // 거절 —— 사선으로 지운다
+          c.strokeStyle = P.seal;
+          c.lineWidth = Math.max(1.5, H * 0.008);
+          const s = H * 0.075;
+          c.beginPath();
+          c.moveTo(cx - s, y - H * 0.13);
+          c.lineTo(cx + s, y - H * 0.005);
+          c.stroke();
+        } else if (hit) {
+          seal(c, cx + w * 0.30, y - H * 0.085, Math.max(9, H * 0.052), '登', since);
+        }
       }
     }
 
@@ -442,73 +916,58 @@
         if (p.y > this.h * 1.15 && !p.alive) continue;
 
         const isChamp = p.i === champ;
-        const r = isChamp ? Math.max(baseR, this.h * 0.105) : baseR;
-        const col = (this.divisions[p.div] && this.divisions[p.div].color) || '#8B93B0';
+        const onRoof = isChamp && this.scene === 'rooftop';
+        const r = isChamp ? Math.max(baseR, this.h * (onRoof ? ROOF_R : 0.105)) : baseR;
+        // 소속색은 서버 명부(data/employees.json)가 원본이다. DIV_TINT는 못 받았을 때의 대비책.
+        const tint = (this.divisions[p.div] && this.divisions[p.div].color) || DIV_TINT[p.div % DIV_TINT.length];
         c.globalAlpha = isChamp ? 1 : p.fade;
 
-        // 우승자 발밑의 빛과 그림자 — 혼자 서 있다는 게 읽혀야 한다
-        if (isChamp) {
-          const g = c.createRadialGradient(p.x, p.y, r * 0.2, p.x, p.y, r * 3.4);
-          g.addColorStop(0, 'rgba(255,180,60,.20)');
-          g.addColorStop(1, 'rgba(255,180,60,0)');
-          c.fillStyle = g;
-          c.beginPath();
-          c.arc(p.x, p.y, r * 3.4, 0, 6.283);
-          c.fill();
+        const X = p.x;
+        const Y = p.y;
 
-          c.fillStyle = 'rgba(0,0,0,.35)';
+        // 발밑 접지선. 도면에서 사람이 바닥에 닿아 있다는 표시는 짧은 가로선 하나면 된다.
+        if (isChamp) {
+          c.strokeStyle = P.ink;
+          c.lineWidth = 1;
           c.beginPath();
-          c.ellipse(p.x, p.y + r * 0.22, r * 1.15, r * 0.28, 0, 0, 6.283);
-          c.fill();
+          c.moveTo(px(X - r * 1.1), px(Y));
+          c.lineTo(px(X + r * 1.1), px(Y));
+          c.stroke();
+          hatch(c, X - r * 1.1, Y, r * 2.2, r * 0.22, 4, 0.28, 1);
         }
 
-        // 달리는 중이면 살짝 위아래로 튄다
         const running = Math.abs(p.y - p.ty) > r * 0.6;
-        const bob = running
-          ? Math.abs(Math.sin(t / 90 + p.seed * 6.3)) * r * 0.35
-          : Math.sin(t / 640 + p.seed * 6.3) * r * 0.1;
+        const bob = running ? Math.abs(Math.sin(t / 90 + p.seed * 6.3)) * r * 0.28 : 0;
 
-        if (tier <= 1) {
-          c.fillStyle = col;
+        // 아주 멀리서 본 군중. 한 사람이 몇 px이면 윤곽선이 뭉개지므로 점으로 찍는다.
+        if (tier <= 1 && !isChamp) {
+          c.fillStyle = tint;
           c.beginPath();
-          c.arc(p.x, p.y - bob, r * 0.92, 0, 6.283);
+          c.arc(X, Y - r * 0.9 - bob, r * 0.75, 0, 6.283);
           c.fill();
         } else {
-          c.fillStyle = col;
-          c.beginPath();
-          c.arc(p.x, p.y - r * 1.55 - bob, r * 0.6, 0, 6.283);
-          c.fill();
-          c.beginPath();
-          c.moveTo(p.x - r * 0.62, p.y - bob);
-          c.lineTo(p.x - r * 0.4, p.y - r * 0.85 - bob);
-          c.lineTo(p.x + r * 0.4, p.y - r * 0.85 - bob);
-          c.lineTo(p.x + r * 0.62, p.y - bob);
-          c.closePath();
-          c.fill();
+          this.drawPerson(c, X, Y - bob, r, tint, running);
         }
 
-        // 방향을 감춘 구간에서는 머리 위에 불만 켜진다
+        // 방향을 감춘 구간에서는 머리 위에 표시만 남는다
         if (p.decided && !p.choice && p.alive) {
-          c.fillStyle = '#FFB43C';
+          c.strokeStyle = P.ink;
+          c.lineWidth = 1;
           c.beginPath();
-          c.arc(p.x, p.y - r * 2.9 - bob, r * 0.27, 0, 6.283);
-          c.fill();
+          c.arc(X, Y - r * 3.3 - bob, Math.max(1.5, r * 0.26), 0, 6.283);
+          c.stroke();
         }
 
-        // 배지는 알아볼 수 있어야 뜻이 있다. 점만 찍으면 그게 뭔지 아무도 모른다.
-        // 작을 때는 아예 안 그린다 — 뭉개진 얼룩은 정보가 아니라 노이즈다.
-        if (p.alive && r >= 6) {
-          if (p.flag === 'v') this.drawCrown(c, p.x, p.y - r * 2.55 - bob, r);
-          else if (p.flag === 'n') this.drawSprout(c, p.x + r * 1.05, p.y - r * 2.3 - bob, r);
+        if (p.alive && r >= 4) {
+          if (p.flag === 'v') this.drawCrown(c, X, Y - r * 3.35 - bob, r);
+          else if (p.flag === 'n') this.drawSprout(c, X + r * 0.95, Y - r * 2.9 - bob, r);
         }
 
+        // 본인 표시 — 도면의 인출선과 부호로 가리킨다
         if (this.myIndex === p.i && p.alive) {
           c.globalAlpha = 1;
-          c.strokeStyle = '#FFFFFF';
-          c.lineWidth = Math.max(1.2, r * 0.16);
-          c.beginPath();
-          c.arc(p.x, p.y - r * 0.9 - bob, r * 2, 0, 6.283);
-          c.stroke();
+          callout(c, '本人', X + r * 0.5, Y - r * 1.6 - bob,
+            X + r * 2.6, Y - r * 3.2 - bob, Math.max(7, r * 0.85));
         }
 
         if (tier >= 3 && p.alive && namedMap) {
@@ -516,13 +975,14 @@
           if (info) {
             c.globalAlpha = 1;
             c.textAlign = 'center';
-            c.fillStyle = 'rgba(255,255,255,.92)';
-            c.font = `700 ${Math.max(9, r * 0.6)}px ui-monospace, monospace`;
-            c.fillText(tier >= 4 ? info.name : info.empId, p.x, p.y + r * 1.5);
+            c.textBaseline = 'top';
+            c.fillStyle = P.ink;
+            c.font = `500 ${Math.max(7, r * 0.75)}px "Nanum Myeongjo", Batang, 바탕, serif`;
+            c.fillText(tier >= 4 ? info.name : info.empId, X, Y + r * 0.4);
             if (tier >= 4) {
-              c.fillStyle = 'rgba(255,255,255,.5)';
-              c.font = `${Math.max(8, r * 0.45)}px system-ui, sans-serif`;
-              c.fillText(info.dept, p.x, p.y + r * 2.4);
+              c.fillStyle = P.mid;
+              c.font = `${Math.max(6, r * 0.58)}px ui-monospace, monospace`;
+              c.fillText(info.dept, X, Y + r * 1.5);
             }
           }
         }
@@ -530,61 +990,123 @@
       c.globalAlpha = 1;
     }
 
-    /** VIP 왕관 */
-    drawCrown(c, x, y, r) {
-      c.fillStyle = '#FFB43C';
-      c.beginPath();
-      c.moveTo(x - r * 0.72, y + r * 0.34);
-      c.lineTo(x - r * 0.72, y - r * 0.34);
-      c.lineTo(x - r * 0.34, y + r * 0.06);
-      c.lineTo(x, y - r * 0.5);
-      c.lineTo(x + r * 0.34, y + r * 0.06);
-      c.lineTo(x + r * 0.72, y - r * 0.34);
-      c.lineTo(x + r * 0.72, y + r * 0.34);
-      c.closePath();
-      c.fill();
-    }
-
-    /** 신입 새싹 — 줄기와 잎 두 장 */
-    drawSprout(c, x, y, r) {
-      c.strokeStyle = '#4FC08D';
-      c.lineWidth = Math.max(1, r * 0.15);
+    /**
+     * 인물 기호.
+     *
+     * 도면 속 사람은 사진이 아니라 기호다. 윤곽선으로 형태를 정하고 안쪽을 소속색으로
+     * 아주 옅게만 채운다. 색이 선을 이기면 그 순간 도면이 아니라 삽화가 된다.
+     */
+    drawPerson(c, x, y, r, tint, running) {
+      c.lineWidth = Math.max(0.7, r * 0.11);
+      c.strokeStyle = P.ink;
+      c.lineJoin = 'round';
       c.lineCap = 'round';
+
+      // 다리
       c.beginPath();
-      c.moveTo(x, y + r * 0.5);
-      c.lineTo(x, y - r * 0.1);
+      if (running) {
+        c.moveTo(x - r * 0.52, y);
+        c.lineTo(x - r * 0.05, y - r * 1.15);
+        c.moveTo(x + r * 0.48, y - r * 0.18);
+        c.lineTo(x + r * 0.05, y - r * 1.15);
+      } else {
+        c.moveTo(x - r * 0.32, y);
+        c.lineTo(x - r * 0.08, y - r * 1.15);
+        c.moveTo(x + r * 0.32, y);
+        c.lineTo(x + r * 0.08, y - r * 1.15);
+      }
       c.stroke();
 
-      c.fillStyle = '#4FC08D';
+      // 몸통 — 사다리꼴 윤곽에 옅은 소속색
       c.beginPath();
-      c.ellipse(x - r * 0.3, y + r * 0.02, r * 0.3, r * 0.15, -0.7, 0, 6.283);
+      c.moveTo(x - r * 0.55, y - r * 1.15);
+      c.lineTo(x - r * 0.42, y - r * 2.15);
+      c.lineTo(x + r * 0.42, y - r * 2.15);
+      c.lineTo(x + r * 0.55, y - r * 1.15);
+      c.closePath();
+      c.fillStyle = tint;
+      c.globalAlpha *= 0.42;
       c.fill();
+      c.globalAlpha /= 0.42;
+      c.stroke();
+
+      // 머리 — 비워 둔다. 도면의 인물은 얼굴이 없다.
       c.beginPath();
-      c.ellipse(x + r * 0.3, y - r * 0.12, r * 0.3, r * 0.15, 0.7, 0, 6.283);
+      c.arc(x, y - r * 2.68, r * 0.55, 0, 6.283);
+      c.fillStyle = P.paper;
       c.fill();
+      c.stroke();
     }
 
-    drawFloorTag(c, W, H, sc) {
+    /** VIP 왕관 */
+    drawCrown(c, x, y, r) {
+      c.strokeStyle = P.ink;
+      c.lineWidth = Math.max(0.7, r * 0.1);
+      c.beginPath();
+      c.moveTo(x - r * 0.6, y + r * 0.3);
+      c.lineTo(x - r * 0.6, y - r * 0.35);
+      c.lineTo(x - r * 0.25, y + r * 0.02);
+      c.lineTo(x, y - r * 0.5);
+      c.lineTo(x + r * 0.25, y + r * 0.02);
+      c.lineTo(x + r * 0.6, y - r * 0.35);
+      c.lineTo(x + r * 0.6, y + r * 0.3);
+      c.closePath();
+      c.stroke();
+    }
+
+    /** 신입 새싹 */
+    drawSprout(c, x, y, r) {
+      c.strokeStyle = P.ink;
+      c.lineWidth = Math.max(0.7, r * 0.1);
+      c.beginPath();
+      c.moveTo(x, y + r * 0.55);
+      c.lineTo(x, y - r * 0.3);
+      c.moveTo(x, y - r * 0.05);
+      c.lineTo(x - r * 0.45, y - r * 0.35);
+      c.moveTo(x, y - r * 0.2);
+      c.lineTo(x + r * 0.45, y - r * 0.5);
+      c.stroke();
+    }
+
+    /** 도면 번호와 쪽번호. 공보의 머리와 발이다. */
+    drawFloorTag(c, W, H, sc, champScene) {
+      const s = Math.max(7, Math.round(Math.min(W, H) * 0.045));
+      const m = Math.max(5, Math.round(Math.min(W, H) * 0.022));
+
       c.textAlign = 'left';
-      c.font = '600 11px ui-monospace, monospace';
-      c.fillStyle = 'rgba(255,255,255,.4)';
-      c.fillText(`${this.floor}F · ${sc.label}`, 12, H - 12);
+      c.textBaseline = 'top';
+      c.fillStyle = P.ink;
+      c.font = `500 ${s}px "Nanum Myeongjo", Batang, 바탕, serif`;
+      c.fillText(`【도 ${sc.no}】 ${sc.caption}`, m + s * 0.5, m + s * 0.4);
+
+      // 쪽번호 — 공보는 늘 아래 가운데에 - N - 이 있다
+      c.textAlign = 'center';
+      c.textBaseline = 'bottom';
+      c.fillStyle = P.mid;
+      c.font = `${Math.max(6, s * 0.8)}px ui-monospace, monospace`;
+      c.fillText(champScene ? `- ${sc.label} -` : `- ${this.floor} -`, W / 2, H - m - 2);
     }
 
-    /** 미니 타워 — 지금 몇 층인지 */
+    /** 미니 타워 — 지금 몇 층인지. 지나온 층은 해칭, 지금 층은 채운다. */
     drawTower(ctx, x, y, w, h, maxFloor) {
       const floors = Math.max(6, maxFloor);
       const fh = h / floors;
       for (let f = 1; f <= floors; f += 1) {
         const fy = y + h - f * fh;
         const here = f === this.floor;
-        ctx.fillStyle = here ? '#FFB43C' : f < this.floor ? 'rgba(255,180,60,.28)' : 'rgba(255,255,255,.08)';
-        ctx.fillRect(x, fy + 2, w, fh - 4);
+        ctx.strokeStyle = P.ink;
+        ctx.lineWidth = 0.9;
+        ctx.strokeRect(px(x), px(fy + 2), Math.round(w), Math.round(fh - 4));
         if (here) {
-          ctx.fillStyle = '#241503';
+          ctx.fillStyle = P.ink;
+          ctx.fillRect(px(x), px(fy + 2), Math.round(w), Math.round(fh - 4));
+          ctx.fillStyle = P.paper;
           ctx.font = `700 ${Math.min(13, fh * 0.6)}px ui-monospace, monospace`;
           ctx.textAlign = 'center';
+          ctx.textBaseline = 'alphabetic';
           ctx.fillText(`${f}F`, x + w / 2, fy + fh * 0.68);
+        } else if (f < this.floor) {
+          hatch(ctx, x + 1, fy + 3, w - 2, fh - 6, 4, 0.30, 1);
         }
       }
     }
@@ -592,4 +1114,21 @@
 
   global.CrowdStage = CrowdStage;
   global.CROWD_SCENES = SCENES;
+  global.CROWD_PALETTE = P;
+  global.crowdHatch = hatch;
+  global.crowdSeal = seal;
+  global.crowdCallout = callout;
+  // 인물 기호. drawPerson은 this를 쓰지 않으므로 그대로 떼어 쓴다.
+  global.crowdDrawPerson = CrowdStage.prototype.drawPerson;
+  global.CROWD_DIV_TINT = DIV_TINT;
+
+  /** 엔딩 카드가 같은 옥상을 그리려고 쓴다. 두 곳에 같은 그림을 두지 않으려는 것. */
+  global.paintCrowdScene = (c, name, W, H, t, stage) => {
+    const sc = SCENES[name] || SCENES.lobby;
+    c.fillStyle = P.paper;
+    c.fillRect(0, 0, W, H);
+    sc.draw(c, W, H, t, stage);
+  };
+  // 옥상 구도. roof-lab.html이 사진의 난간선을 여기에 맞추려고 읽는다.
+  global.ROOF_GEOMETRY = { sky: ROOF_SKY, edge: ROOF_EDGE, deck: ROOF_DECK, stand: ROOF_STAND };
 })(window);

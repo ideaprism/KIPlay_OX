@@ -35,10 +35,60 @@ const SCENE_KO = {
   archive: '서고', datacenter: '전산실', rooftop: '옥상',
 };
 
+// ─────────────────────────────────────────── 엔딩 카드
+//
+// 전광판이 진짜 쇼다. 참여자 화면보다 오래 머문다.
+
+let endingCard = null;
+let endingDone = false;
+
+/**
+ * 공보 서지사항을 만든다.
+ *
+ * 등록번호는 회차와 이름에서 뽑아 매주 다르되 같은 회차에서는 늘 같게 나온다.
+ * 자리수는 실제 최근 등록번호(10-30xxxxx)에 맞췄다.
+ */
+function buildGazette(s, r) {
+  const ch = r.champion;
+  let hash = 0;
+  const seedStr = `${ch.name}${ch.dept}${r.totalPlayers}${(s.crowd && s.crowd.round) || 1}`;
+  for (let i = 0; i < seedStr.length; i += 1) hash = (hash * 31 + seedStr.charCodeAt(i)) >>> 0;
+
+  const d = new Date(s.serverNow || Date.now());
+  const yy = d.getFullYear();
+  const pubDate = `${yy}년${String(d.getMonth() + 1).padStart(2, '0')}월${String(d.getDate()).padStart(2, '0')}일`;
+  const runnerUp = (r.ranking && r.ranking[1] && r.ranking[1].name) || '원장실';
+
+  return {
+    regNo: `10-30${String(hash % 100000).padStart(5, '0')}`,
+    appNo: `10-${yy}-0${String(hash % 1000000).padStart(6, '0')}`,
+    pubDate,
+    examiner: runnerUp,
+    round: (s.crowd && s.crowd.round) || 1,
+  };
+}
+
+function playEnding(s) {
+  const r = s.result;
+  if (!r || !r.champion || endingDone) return;
+  if (!window.EndingCard || !$('ending')) return;
+  endingDone = true;
+  if (!endingCard) endingCard = new window.EndingCard($('ending'), { hold: 3000 });
+  endingCard.show(Object.assign({
+    name: r.champion.name,
+    dept: r.champion.dept,
+    survived: r.champion.survived,
+    isNew: r.champion.isNew,
+    floor: r.floor,
+    totalPlayers: r.totalPlayers,
+  }, buildGazette(s, r)));
+}
+
 // ─────────────────────────────────────────── 무대
 
 function initStage() {
   stage = new CrowdStage($('stage-canvas'), { zones: true });
+  stage.setBackdrop(window.ROOF_BACKDROP_CONFIG);
   stage.start();
 
   // 층 환경 확인용 픽스처. 서버 없이 각 층을 바로 볼 수 있다.
@@ -153,29 +203,54 @@ function renderDivStanding(s) {
 // ── 중계
 const commentary = new Commentary();
 const captionQueue = [];
+let lastSpokenPhase = null;
+const GAP_MS = 600;   // 문장 사이 한 박자
 let captionTimer = null;
 
+/**
+ * 자막 한 줄을 띄우고 읽는다.
+ *
+ * 위상이 바뀌면 하던 말을 끊는다. 대기실 인사를 다 읽느라 첫 문항 소개가 뒤로 밀리면
+ * 화면은 이미 문제를 보여주는데 귀에서는 아직 대기실 이야기가 나온다. 그게 어긋남의 정체였다.
+ */
 function showCaption(line) {
   const el = $('b-caption');
   el.textContent = line.text;
   el.dataset.tone = line.tone || '';
   clearTimeout(captionTimer);
   captionTimer = setTimeout(() => { el.textContent = ''; el.dataset.tone = ''; }, 8000);
-  if (audioReady) Sfx.say(line.say || line.text);
+  const turn = line.phase && line.phase !== lastSpokenPhase;
+  lastSpokenPhase = line.phase || lastSpokenPhase;
+  if (audioReady) Sfx.say(line.say || line.text, { force: turn });
 }
 
+/**
+ * 자막을 한 줄씩 흘린다.
+ *
+ * 예전에는 고정 간격이었다. 그런데 한국어 한 문장은 3~4초가 걸리는데 간격이 2.8초라,
+ * 다음 줄이 앞줄을 밟고 올라서면서 중계가 계속 뒤로 밀렸다. 첫 문항이 뜰 때쯤이면
+ * 이미 몇 초가 밀려 있었다. 읽는 데 걸리는 시간만큼 기다린다.
+ *
+ * 위상이 지나간 대사는 버린다. 늦은 중계는 없느니만 못하다.
+ */
 function drainCaptions() {
   const line = captionQueue.shift();
   if (!line) return;
+  if (line.phase && snap && snap.phase !== line.phase) {
+    drainCaptions();   // 이미 지난 이야기다
+    return;
+  }
   showCaption(line);
-  if (captionQueue.length) setTimeout(drainCaptions, 3000);
+  if (captionQueue.length) {
+    setTimeout(drainCaptions, Sfx.estimate(line.say || line.text) + GAP_MS);
+  }
 }
 
 /** 여러 줄이 한꺼번에 나오면 읽히지 않는다. 간격을 두고 하나씩 흘린다. */
 function runCommentary(s) {
   const lines = commentary.update(s);
   if (!lines.length) return;
-  for (const line of lines) captionQueue.push(line);
+  for (const line of lines) captionQueue.push(Object.assign({ phase: s.phase }, line));
   if (captionQueue.length === lines.length) drainCaptions();
 }
 
@@ -262,6 +337,8 @@ function render(s) {
       $('b-center-floor').hidden = true;
       $('b-center-sub').textContent = `${s.joined}명 입장`;
       $('b-center-list').hidden = true;
+      endingDone = false;   // 다음 회차의 엔딩을 위해 되돌린다
+      if (endingCard) endingCard.finish();
       break;
 
     case 'question':
@@ -328,6 +405,7 @@ function render(s) {
       const hasChamp = !!(r && r.champion);
       $('b-center').classList.toggle('on-rooftop', hasChamp);
       if (hasChamp) stage.setChampion(r.champion.ci);
+      playEnding(s);
 
       const list = $('b-center-list');
       list.hidden = false;

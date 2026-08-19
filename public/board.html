@@ -83,7 +83,9 @@ body { overflow: hidden; }
 .stage-canvas-wrap { position: relative; min-height: 0; }
 #stage-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 
+/* 전광판 문항도 명세서 본문이다 */
 .bq {
+  font-family: var(--serif);
   font-size: clamp(22px, 2.7vw, 46px);
   font-weight: 700; line-height: 1.3; letter-spacing: -0.025em;
   margin: 0; max-width: 92%; text-wrap: balance;
@@ -126,14 +128,14 @@ body { overflow: hidden; }
 
 .split { display: flex; flex-direction: column; gap: 6px; min-width: clamp(160px, 20vw, 320px); }
 .split-nums { display: flex; justify-content: space-between; font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: clamp(15px, 1.6vw, 26px); font-weight: 700; }
-.split-bar { display: flex; height: clamp(10px, 1.2vh, 18px); background: rgba(255,255,255,.12); overflow: hidden; }
+.split-bar { display: flex; height: clamp(10px, 1.2vh, 18px); background: rgba(20,20,20,.12); overflow: hidden; }
 .split-bar span { display: block; transition: width 260ms cubic-bezier(.25,.46,.45,.94); }
 .split-bar .s-o { background: var(--ink-2); }
 .split-bar .s-x { background: var(--surface-3); }
-.split.hidden .split-bar { background: repeating-linear-gradient(90deg, rgba(255,255,255,.12) 0 6px, transparent 6px 12px); }
+.split.hidden .split-bar { background: repeating-linear-gradient(90deg, rgba(20,20,20,.12) 0 6px, transparent 6px 12px); }
 .split.hidden .split-nums { color: var(--ink-3); }
 
-.btimer { height: 8px; background: rgba(255,255,255,.14); overflow: hidden; margin-bottom: 12px; }
+.btimer { height: 8px; background: rgba(20,20,20,.14); overflow: hidden; margin-bottom: 12px; }
 .btimer .fill { height: 100%; background: var(--amber); transform-origin: left center; }
 .btimer.urgent .fill { background: var(--out); }
 
@@ -176,7 +178,7 @@ body { overflow: hidden; }
   position: absolute; inset: 0; z-index: 4;
   display: flex; flex-direction: column; justify-content: center; align-items: center;
   gap: clamp(10px, 1.8vh, 24px); padding: clamp(20px, 3vw, 56px); text-align: center;
-  background: linear-gradient(180deg, rgba(14,16,32,.82), rgba(14,16,32,.94));
+  background: var(--surface);
 }
 
 /* 우승 장면에서는 화면을 덮으면 안 된다. 옥상과 챔피언이 그 아래 있기 때문이다.
@@ -185,11 +187,11 @@ body { overflow: hidden; }
   justify-content: flex-start;
   gap: clamp(6px, 1vh, 14px);
   padding-top: clamp(18px, 3vh, 44px);
-  background: linear-gradient(180deg, rgba(14,16,32,.92) 0%, rgba(14,16,32,.72) 32%, rgba(14,16,32,.28) 52%, rgba(14,16,32,0) 68%);
+  background: linear-gradient(180deg, rgba(250,247,240,.97) 0%, rgba(250,247,240,.90) 34%, rgba(250,247,240,.40) 56%, rgba(250,247,240,0) 72%);
   pointer-events: none;
 }
 
-.bcenter.on-rooftop .champ-name { text-shadow: 0 4px 28px rgba(0,0,0,.8); }
+.bcenter.on-rooftop .champ-name { font-family: var(--serif); text-shadow: 0 1px 0 var(--surface); }
 .bcenter.on-rooftop .blist { display: none; }   /* 순위표는 옥상을 가린다 */
 
 .bcenter .huge {
@@ -197,7 +199,7 @@ body { overflow: hidden; }
   font-size: clamp(76px, 15vw, 260px); font-weight: 700; line-height: 0.86;
   letter-spacing: -0.055em; color: var(--amber);
 }
-.bcenter .champ-name { font-size: clamp(44px, 7vw, 116px); font-weight: 700; letter-spacing: -0.04em; line-height: 1.02; }
+.bcenter .champ-name { font-family: var(--serif); font-size: clamp(44px, 7vw, 116px); font-weight: 700; letter-spacing: -0.04em; line-height: 1.02; }
 .bcenter .sub { font-size: clamp(15px, 1.5vw, 26px); color: var(--ink-2); }
 .bcenter .floor-badge {
   font-family: var(--mono); font-size: clamp(16px, 1.7vw, 28px); font-weight: 700;
@@ -300,7 +302,13 @@ body { overflow: hidden; }
   </aside>
 </div>
 
+<div class="ending" id="ending" hidden aria-live="polite">
+  <canvas id="ending-canvas"></canvas>
+</div>
+
+<script src="roofimage.js"></script>
 <script src="crowd.js"></script>
+<script src="ending.js"></script>
 <script src="sfx.js"></script>
 <script src="commentary.js"></script>
 <script src="board.js"></script>

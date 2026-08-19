@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0E1020">
+<meta name="theme-color" content="#EFEBE1">
 <title>12:55</title>
 <link rel="stylesheet" href="style.css">
 </head>
@@ -26,6 +26,7 @@
     </div>
     <button class="btn btn-primary" type="submit" id="join-btn">입장</button>
     <button class="btn" type="button" id="demo-open">혼자 체험해보기</button>
+    <button class="btn" type="button" id="spec-open">게임 설명</button>
     <p class="error" id="login-error" role="alert"></p>
     <p class="hint" id="login-hint">사번 5자리를 입력하세요.<br>2년차 미만이면 부활권 1개가 자동 지급됩니다.</p>
   </form>
@@ -145,6 +146,8 @@
   </div>
 
   <p class="send-state" id="send-state" role="status" aria-live="polite"></p>
+
+  <p class="arm-note" id="q-arm-note" role="status" aria-live="polite" hidden>문항을 읽어드리는 중입니다</p>
 
   <div class="choices">
     <button class="choice" id="btn-o" aria-pressed="false" aria-label="O, 맞다"><span class="glyph">O</span></button>
@@ -267,7 +270,13 @@
   </div>
 </section>
 
+<div class="ending" id="ending" hidden aria-live="polite">
+  <canvas id="ending-canvas"></canvas>
+</div>
+
+<script src="roofimage.js"></script>
 <script src="crowd.js"></script>
+<script src="ending.js"></script>
 <script src="sfx.js"></script>
 <script src="commentary.js"></script>
 <script src="app.js"></script>

@@ -93,6 +93,7 @@ async function join(empId, strategy) {
     token: data.token,
     strategy,
     submitted: [],     // 문항별 제출 답
+    answering: -1,     // 이 문항의 제출을 이미 시작했는가
     revivePrompted: 0,
     reviveUsed: 0,
     alive: true,
@@ -105,10 +106,16 @@ async function join(empId, strategy) {
     p.alive = s.me.alive;
     p.survived = s.me.survived;
 
-    if (s.phase === 'question' && s.me.alive) {
+    if (s.phase === 'question' && s.me.alive && p.answering !== s.qIndex) {
+      p.answering = s.qIndex;
       const answer = strategy(s.qIndex);
       p.submitted[s.qIndex] = answer;              // null이면 무응답
-      if (answer) await post('/api/answer', { token: p.token, qIndex: s.qIndex, answer, rt: 1200 });
+      if (answer) {
+        // 브리핑 구간에는 서버가 접수하지 않는다(409 not armed). 문이 열린 뒤에 낸다.
+        const wait = (s.armAt || 0) - Date.now();
+        if (wait > 0) await sleep(wait + 150);
+        await post('/api/answer', { token: p.token, qIndex: s.qIndex, answer, rt: 1200 });
+      }
     }
 
     if (s.phase === 'revive' && s.me.revivePending) {
@@ -139,9 +146,9 @@ function observe() {
   return { seen, close };
 }
 
-// 층 상승 연출로 정답 공개가 4~6초로 늘어 한 판이 90초를 넘길 수 있다.
+// 층 상승 연출과 문항 브리핑으로 한 판이 2분을 넘길 수 있다. 예산은 5분이다.
 // 5분 슬롯이 하드 제약이므로 실제 소요 시간도 함께 기록한다.
-async function waitForResult(obs, timeoutMs = 180000) {
+async function waitForResult(obs, timeoutMs = 300000) {
   const t0 = Date.now();
   while (!obs.seen.result && Date.now() - t0 < timeoutMs) await sleep(200);
   obs.elapsedMs = Date.now() - t0;
@@ -405,8 +412,8 @@ async function scenarioF() {
   });
 
   await post('/api/demo/start', { token: solo.token, bots: 150, lobbySec: 2 });
-  // 층 상승 연출로 정답 공개가 4~6초로 늘어나 한 판이 90초를 넘길 수 있다
-  const result = await waitForResult(obs, 180000);
+  // 층 상승 연출과 문항 브리핑으로 한 판이 2분을 넘길 수 있다
+  const result = await waitForResult(obs, 300000);
 
   ok(visibleAbove, `${TH}명 이상 구간에서는 집계가 보임`);
   ok(!leak, '가려진 뒤로는 집계가 한 번도 새지 않음');
@@ -423,7 +430,8 @@ async function scenarioF() {
 
   // 5분 슬롯이 하드 제약이다. 대기실 2초를 뺀 순수 게임 시간을 본다.
   const gameSec = (obs.elapsedMs - 2000) / 1000;
-  ok(gameSec < 180, `한 판 ${gameSec.toFixed(1)}초 — 3분 예산 이내`);
+  // 예산은 점심시간 마지막 5분이다. 그 안에만 들어오면 된다.
+  ok(gameSec < 300, `한 판 ${gameSec.toFixed(1)}초 — 5분 예산 이내`);
 
   close(); solo.close(); obs.close();
 }

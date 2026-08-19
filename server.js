@@ -25,6 +25,19 @@ const CONFIG = {
   // 7초는 너무 빡빡했다. 문제를 읽고, 남들이 어디로 가는지 보고, 마음을 정할 틈이 필요하다.
   // 10초로 늘려도 한 판이 2분 안쪽이라 5분 슬롯에 여유가 있다.
   questionMs: Number(process.env.QUESTION_MS) || 10000,
+
+  /**
+   * 문항 브리핑 구간. 문항이 화면에 뜨고 나서 응답 시계가 켜지기까지의 시간이다.
+   *
+   * 이게 없으면 문항 공개와 동시에 시계가 돌기 시작해서, 중계가 "N번 문항, 난이도 …"를
+   * 말하는 동안 이미 답을 받고 있다. 화면이 늘 나레이션보다 앞선다.
+   * 모두에게 같은 시각에 열리므로 공정성에는 영향이 없다.
+   *
+   * 3400ms는 "N번 문항. 난이도 어려움."을 읽는 시간(약 3.2초)에서 나왔다. 5문항이면
+   * 한 판에 18초가 붙는다. 실측 124초짜리 회차가 143초가 되며, 예산인 5분 안에 넉넉히 남는다.
+   * 문항 수나 중계 문구를 바꾸면 이 값도 같이 봐야 한다.
+   */
+  armMs: Number(process.env.ARM_MS) || 3400,
   revealMs: 3000,     // 정답 공개 (아래 revealMsFor로 인원에 따라 늘어난다)
   reviveMs: 4000,     // 부활권 선택
   suddenMs: 20000,    // 서든데스
@@ -195,11 +208,12 @@ function clearBots() {
 }
 
 /** 문항 공개와 동시에 봇들의 응답을 응답 창 안에 흩어서 예약한다. */
-function scheduleBotAnswers(q) {
+function scheduleBotAnswers(q, armMs = 0) {
   const base = BOT_ACCURACY[q.difficulty] ?? 0.6;
   for (const p of game.players.values()) {
     if (!p.isBot || !p.alive || p.afk) continue;
-    const delay = 500 + Math.random() * (CONFIG.questionMs - 1200);
+    // 브리핑 중에는 봇도 답하지 않는다. 집계 바가 문제도 읽기 전에 움직이면 이상하다.
+    const delay = armMs + 500 + Math.random() * (CONFIG.questionMs - 1200);
     laterBot(delay, () => {
       if (game.phase !== 'question' || !p.alive) return;
       const acc = Math.min(0.97, Math.max(0.05, base * p.skill));
@@ -231,6 +245,7 @@ const game = {
   demo: false,
   round: 0,
   floor: 1,      // 정답을 맞힌 쪽이 올라간다. 1층에서 시작한다.
+  armAt: 0,      // 응답 시계가 켜지는 시각. 그전은 브리핑 구간이다.
   crowd: [],     // 렌더러가 쓰는 고정 순서 배열. 인덱스가 곧 화면상의 사람이다.
   phaseEndsAt: 0,
 
@@ -420,6 +435,7 @@ function publicState() {
     tallyVisible: showTally,
     tallyFrom: CONFIG.tallyVisibleFrom,
     questionMs: CONFIG.questionMs,
+    armAt: game.phase === 'question' ? game.armAt : null,
     suddenMs: CONFIG.suddenMs,
     divAlive: divisionCounts(),
     divisionNames: DIVISIONS.map((d) => ({ id: d.id, name: d.name, short: d.short || d.name })),
@@ -561,7 +577,10 @@ function beginQuestion(index) {
   clearTimers();
   game.qIndex = index;
   game.phase = 'question';
-  game.phaseEndsAt = Date.now() + CONFIG.questionMs;
+  // 첫 문항은 대기실 인사까지 이어 말해야 하므로 브리핑을 조금 더 준다
+  const armMs = index === 0 ? Math.round(CONFIG.armMs * 1.35) : CONFIG.armMs;
+  game.armAt = Date.now() + armMs;
+  game.phaseEndsAt = game.armAt + CONFIG.questionMs;
   game.lastReveal = null;
 
   if (index === 0) buildCrowd(); // 첫 문항 시점의 참가자가 이 회차의 군중이다
@@ -573,9 +592,9 @@ function beginQuestion(index) {
   }
 
   pushState();
-  scheduleBotAnswers(game.questions[index]);
+  scheduleBotAnswers(game.questions[index], armMs);
   tallyTimer = setInterval(pushTally, CONFIG.tallyMs);
-  schedule(CONFIG.questionMs, revealQuestion);
+  schedule(armMs + CONFIG.questionMs, revealQuestion);
 }
 
 function revealQuestion() {
@@ -989,6 +1008,9 @@ async function handler(req, res) {
     if (game.phase !== 'question') return sendJson(res, 409, { error: 'not accepting' });
     if (!player.alive) return sendJson(res, 409, { error: 'eliminated' });
     if (body.qIndex !== game.qIndex) return sendJson(res, 409, { error: 'stale question' });
+    // 브리핑이 끝나기 전에는 접수하지 않는다. 서버가 문을 여는 시각이 모두에게 같다.
+    // 네트워크와 시계 오차만큼은 봐준다. 진짜로 이른 것만 막는다.
+    if (game.armAt && Date.now() < game.armAt - 250) return sendJson(res, 409, { error: 'not armed' });
     if (body.answer !== 'O' && body.answer !== 'X') return sendJson(res, 400, { error: 'bad answer' });
 
     player.answer = body.answer; // 마감 전까지 변경 가능 (PRD 5.2)

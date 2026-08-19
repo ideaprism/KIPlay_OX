@@ -222,6 +222,20 @@
       else this._queue.push({ text, opts });
     },
 
+    /**
+     * 이 문장을 읽는 데 걸리는 대략의 시간(ms).
+     *
+     * 자막 간격을 고정값으로 두면 짧은 문장에서는 뜨고 긴 문장에서는 밀린다.
+     * 한국어 TTS는 rate 1에서 초당 대여섯 자쯤 읽고, 문장부호에서 한 박자 쉰다.
+     * 음성이 꺼져 있어도 같은 값을 쓴다 —— 자막만 봐도 호흡이 같아야 한다.
+     */
+    estimate(text) {
+      if (!text) return 0;
+      const str = String(text);
+      const pauses = (str.match(/[.,!?·]/g) || []).length;
+      return Math.min(9000, Math.round(str.length * 165 + pauses * 180 + 400));
+    },
+
     silence() {
       this._queue.length = 0;
       if ('speechSynthesis' in global) global.speechSynthesis.cancel();
