@@ -142,11 +142,6 @@ body { overflow: hidden; }
 /* ── 사이드 */
 .bside { grid-area: side; border-left: 2px solid var(--line-2); display: flex; flex-direction: column; min-height: 0; }
 
-.tower-box { display: flex; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--line); align-items: stretch; }
-#tower-canvas { width: 44px; height: clamp(120px, 18vh, 200px); }
-.tower-info { display: flex; flex-direction: column; justify-content: center; gap: 3px; }
-.tower-info .f { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: clamp(26px, 2.6vw, 40px); font-weight: 700; letter-spacing: -0.04em; color: var(--amber); line-height: 1; }
-.tower-info .s { font-size: clamp(12px, 1.1vw, 16px); color: var(--ink-2); }
 
 .divlegend { display: flex; flex-wrap: wrap; gap: 5px 10px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
 .divlegend div { display: flex; align-items: center; gap: 5px; font-size: clamp(10px, 0.85vw, 13px); color: var(--ink-2); }
@@ -271,7 +266,6 @@ body { overflow: hidden; }
     <section class="bcenter" id="b-center">
       <div class="label" id="b-center-label">대기 중</div>
       <div class="huge mono" id="b-center-big">12:55</div>
-      <div class="floor-badge" id="b-center-floor" hidden></div>
       <div class="sub" id="b-center-sub">매주 월요일 점심시간 마지막 5분</div>
       <div class="blist" id="b-center-list" hidden></div>
     </section>
@@ -286,14 +280,6 @@ body { overflow: hidden; }
   </main>
 
   <aside class="bside">
-    <div class="tower-box">
-      <canvas id="tower-canvas"></canvas>
-      <div class="tower-info">
-        <span class="f mono" id="t-floor">1F</span>
-        <span class="s" id="t-scene">로비</span>
-      </div>
-    </div>
-
     <h2>본부별 생존</h2>
     <div class="divstand" id="b-divstand"></div>
 

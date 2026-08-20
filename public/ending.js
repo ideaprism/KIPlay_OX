@@ -354,7 +354,7 @@
         c.textBaseline = 'top';
         c.fillStyle = P.ink;
         c.font = `${Math.max(7, u * 2.0)}px ${GOTHIC}`;
-        c.fillText('【도 6】 우승자 옥상 사시도', ox + w / 2, by + bh + u * 1.6);
+        c.fillText('【도 2】 우승자 옥상 사시도', ox + w / 2, by + bh + u * 1.6);
       }
     }
 
@@ -373,7 +373,7 @@
 
       const text =
         `본 우승은 ${ch.totalPlayers}명이 참가한 제${ch.round}회 정규전에서 ${ch.survived}개 문항을 연속 통과하고 ` +
-        `${ch.floor}층까지 상승하여 최후의 1인으로 확정된 것을 특징으로 한다.` +
+        `최후의 1인으로 확정된 것을 특징으로 한다.` +
         (ch.isNew ? ' 특히 2년차 미만 참가자가 우승한 사례로서 그 산업상 이용가능성이 크다.' : '');
 
       // 줄바꿈을 직접 한다. 공보 본문은 양끝을 맞춘 좁은 단이다.

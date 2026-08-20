@@ -149,12 +149,13 @@
 
   <p class="arm-note" id="q-arm-note" role="status" aria-live="polite" hidden>문항을 읽어드리는 중입니다</p>
 
-  <div class="choices">
-    <button class="choice" id="btn-o" aria-pressed="false" aria-label="O, 맞다"><span class="glyph">O</span></button>
-    <button class="choice" id="btn-x" aria-pressed="false" aria-label="X, 아니다"><span class="glyph">X</span></button>
+  <!-- 게임장이 곧 버튼이다. 캔버스가 O·X 구역 상자를 그리고,
+       그 상자 위치에 투명 버튼을 겹친다. 도면 좌표(crowd.js의 BOX)와 같은 비율이다. -->
+  <div class="stage-wrap">
+    <div class="crowd-box stage-main"><canvas id="crowd-canvas"></canvas></div>
+    <button class="choice choice-o" id="btn-o" aria-pressed="false" aria-label="O, 맞다"></button>
+    <button class="choice choice-x" id="btn-x" aria-pressed="false" aria-label="X, 아니다"></button>
   </div>
-
-  <div class="crowd-box"><canvas id="crowd-canvas"></canvas></div>
 </section>
 
 <!-- ══════════════════════════════════ 정답 공개 -->

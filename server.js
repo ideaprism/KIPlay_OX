@@ -61,16 +61,8 @@ const CONFIG = {
   tallyVisibleFrom: Number(process.env.TALLY_FROM) || 30,
 };
 
-/**
- * 층 환경. 1층은 로비이고 그 위로는 사무실·심사실·서고·전산실이 순환한다.
- * 옥상은 게임 층이 아니라 우승 장면 전용이다.
- */
-const FLOOR_CYCLE = ['office', 'review', 'archive', 'datacenter'];
-
-function floorScene(floor) {
-  if (floor <= 1) return 'lobby';
-  return FLOOR_CYCLE[(floor - 2) % FLOOR_CYCLE.length];
-}
+/* 게임장은 하나다. 층 상승 구조는 걷어냈다 —— 살아남은 사람들이 같은 자리에서
+ * 계속 겨룬다. 옥상은 게임 장면이 아니라 우승 연출 전용으로만 남는다. */
 
 const POINTS = { join: 5, survive: 10, champion: 50, beatVip: 30 };
 
@@ -244,7 +236,6 @@ const game = {
   phase: 'idle', // idle | lobby | question | reveal | revive | sudden | result
   demo: false,
   round: 0,
-  floor: 1,      // 정답을 맞힌 쪽이 올라간다. 1층에서 시작한다.
   armAt: 0,      // 응답 시계가 켜지는 시각. 그전은 브리핑 구간이다.
   crowd: [],     // 렌더러가 쓰는 고정 순서 배열. 인덱스가 곧 화면상의 사람이다.
   phaseEndsAt: 0,
@@ -430,8 +421,7 @@ function publicState() {
     phase: game.phase,
     demo: game.demo,
     round: game.round,
-    floor: game.floor,
-    scene: floorScene(game.floor),
+    scene: 'ground',
     tallyVisible: showTally,
     tallyFrom: CONFIG.tallyVisibleFrom,
     questionMs: CONFIG.questionMs,
@@ -557,7 +547,6 @@ function startGame(lobbyMs, opts = {}) {
   game.questions = pickQuestions();
   game.suddenQ = BANK.sudden[Math.floor(Math.random() * BANK.sudden.length)];
   game.qIndex = -1;
-  game.floor = 1;
   game.crowd = [];
   game.lastReveal = null;
   game.result = null;
@@ -626,10 +615,8 @@ function revealQuestion() {
   }
 
   const survivors = alivePlayers().length;
-  const fromFloor = game.floor;
-  if (survivors > 0) game.floor += 1; // 정답 쪽 바닥이 올라간다
 
-  // 층 상승 연출이 끝나기 전에 게임이 넘어가면 안 되고, 중계 멘트가 들어갈 틈도 있어야 한다.
+  // 탈락 연출이 끝나기 전에 게임이 넘어가면 안 되고, 중계 멘트가 들어갈 틈도 있어야 한다.
   // 인원이 적을수록 길게 본다 — 후반일수록 한 명 한 명이 중요해지기 때문이다.
   const revealMs = survivors > 0
     ? (survivors <= 10 ? 9000 : survivors < 30 ? 8000 : survivors < 100 ? 7000 : 6000)
@@ -647,8 +634,6 @@ function revealQuestion() {
     eliminatedCount: eliminated.length,
     eliminatedNames: eliminated.slice(0, 8).map((p) => p.name),
     alive: survivors,
-    fromFloor,
-    toFloor: game.floor,
   };
   pushState();
 
@@ -796,8 +781,7 @@ function finish(champion) {
           ci: champion.ci ?? null,
         }
       : null,
-    floor: game.floor,      // 몇 층에서 챔피언이 나왔는가
-    scene: floorScene(game.floor),
+    scene: 'ground',
     ranking,
     sudden: game.suddenResult || null,
     suddenAnswer: game.suddenQ ? { value: game.suddenQ.answer, unit: game.suddenQ.unit, evidence: game.suddenQ.evidence } : null,
@@ -816,7 +800,6 @@ function resetGame() {
   game.phase = 'idle';
   game.demo = false;
   game.qIndex = -1;
-  game.floor = 1;
   game.crowd = [];
   game.phaseEndsAt = 0;
   game.lastReveal = null;
@@ -930,7 +913,6 @@ async function handler(req, res) {
       connected,
       spectators: game.spectators.size,
       alive: alivePlayers().length,
-      floor: game.floor,
       tallyFrom: CONFIG.tallyVisibleFrom,
       uptimeSec: Math.round(process.uptime()),
       rssMB: +(m.rss / 1048576).toFixed(1),

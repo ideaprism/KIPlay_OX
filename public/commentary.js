@@ -80,10 +80,10 @@
         if (r.alive === 0) {
           out.push({ text: '전원 탈락했습니다.', tone: 'bad' });
         } else if (r.eliminatedCount === 0) {
-          out.push({ text: `전원 통과. ${r.alive}명이 ${r.toFloor}층으로 올라갑니다.`, tone: 'good' });
+          out.push({ text: `전원 통과. ${r.alive}명 모두 살아남았습니다.`, tone: 'good' });
         } else {
           out.push({
-            text: `${r.eliminatedCount}명 탈락. ${r.alive}명이 ${r.toFloor}층으로 올라갑니다.`,
+            text: `${r.eliminatedCount}명 탈락. ${r.alive}명이 남았습니다.`,
             tone: 'bad',
           });
         }
@@ -130,7 +130,7 @@
         const r = s.result;
         out.push(
           r.champion
-            ? { text: `${r.floor}층. 오늘의 챔피언은 ${r.champion.dept} ${r.champion.name}님입니다.`, tone: 'good' }
+            ? { text: `오늘의 챔피언은 ${r.champion.dept} ${r.champion.name}님입니다.`, tone: 'good' }
             : { text: '전원 탈락. 챔피언이 나오지 않았습니다.', tone: 'bad' },
         );
         if (r.champion && r.vipBeaten && r.vipBeaten.length) {
@@ -139,7 +139,6 @@
       }
 
       this.lastPhase = s.phase;
-      if (s.floor) this.lastFloor = s.floor;
       return out;
     }
   }

@@ -4,15 +4,15 @@
  * 12:55 — 군중 무대 렌더러
  *
  * 구도
- *   화면 위쪽에 O와 X 두 발판이 있고, 아래 중앙에 사람들이 몰려 있다.
- *   문제가 뜨면 각자 O나 X로 달려 올라간다. 앞사람이 어디로 뛰는지가 그대로 보인다.
+ *   게임장 하나가 도면 한 장이다. O와 X 두 구역 상자가 위쪽 절반을 차지하고,
+ *   아직 답하지 않은 사람들은 아래 대기 구역에 모여 있다. 문제가 뜨면 각자
+ *   구역 상자 안으로 달려 들어간다. 앞사람이 어디로 뛰는지가 그대로 보인다.
  *   인원이 많으면 뒷줄은 화면 아래로 넘쳐 흐른다. 400명을 다 보여줄 필요가 없다.
- *   앞의 100명 남짓이 움직이는 것만 보여도 군중은 군중으로 읽힌다.
  *
- * 층 상승
- *   정답 발판이 위로 오르면 카메라가 따라 올라간다. 그래서 화면 안에서는
- *   맞힌 사람들이 위 발판에서 아래 중앙으로 내려와 다음 층의 군중이 되고,
- *   틀린 사람들은 아래로 흘러 사라진다. 한 번의 연속된 움직임으로 층이 바뀐다.
+ * 정답 공개
+ *   맞은 구역에는 등록 도장이 찍히고 틀린 구역은 사선으로 지워진다. 살아남은
+ *   사람들은 대기 구역으로 내려와 같은 자리에서 다음 문항을 기다린다.
+ *   층 상승 구조는 걷어냈다 —— 게임장은 하나다.
  *
  * 이 파일은 그리기만 한다. 탈락 판정은 서버가 이미 끝냈고 여기서는 확정된 사실을
  * 렌더링할 뿐이다. 프레임이 밀려도 게임 결과는 흔들리지 않는다.
@@ -23,12 +23,18 @@
   const lerp = (a, b, t) => a + (b - a) * t;
 
   // ── 구도 비율 (화면 기준)
-  const ZONE_Y = 0.17;      // O / X 발판의 높이
-  const ZONE_CX_O = 0.27;   // O 발판 중심
-  const ZONE_CX_X = 0.73;   // X 발판 중심
-  const ZONE_W = 0.38;      // 발판 폭
-  const HOME_Y = 0.70;      // 군중 첫 줄
-  const HOME_W = 0.42;      // 군중 폭
+  //
+  // 게임장 하나가 도면 한 장이다. O와 X 두 구역 상자가 지면의 위쪽 절반을 차지하고,
+  // 아직 답하지 않은 사람들은 아래 대기 구역에 모여 있다. 참여자 화면에서는 이 두 상자
+  // 위에 투명 버튼이 겹쳐서, 구역 자체가 곧 버튼이 된다.
+  const BOX = {
+    top: 0.115,   // 구역 상자 윗변
+    bot: 0.60,    // 아랫변
+    oL: 0.035, oR: 0.485,   // O 구역 좌우
+    xL: 0.515, xR: 0.965,   // X 구역 좌우
+  };
+  const HOME_Y = 0.76;      // 대기 구역 첫 줄
+  const HOME_W = 0.46;      // 대기 구역 폭
 
   // ── 옥상 구도 (우승 장면 전용)
   //
@@ -172,22 +178,22 @@
     c.restore();
   }
 
-  // ── 층 환경. 각 층이 도면 한 장이다.
+  // ── 장면은 둘뿐이다. 게임장(도 1)과, 우승 연출 전용의 옥상(도 2).
   const SCENES = {
-    lobby:      { no: 1, label: '로비',   caption: '입장 상태도',       draw: drawLobby },
-    office:     { no: 2, label: '사무실', caption: '응답 이동 상태도',  draw: drawOffice },
-    review:     { no: 3, label: '심사실', caption: '심사 단계 상태도',  draw: drawReview },
-    archive:    { no: 4, label: '서고',   caption: '문헌 열람 상태도',  draw: drawArchive },
-    datacenter: { no: 5, label: '전산실', caption: '연산 처리 상태도',  draw: drawDatacenter },
-    rooftop:    { no: 6, label: '옥상',   caption: '우승자 옥상 사시도', draw: drawRooftop },
+    ground:  { no: 1, label: '게임장', caption: 'O·X 게임장',        draw: drawGround },
+    rooftop: { no: 2, label: '옥상',   caption: '우승자 옥상 사시도', draw: drawRooftop },
   };
 
-  /* 바닥선. 사람이 허공이 아니라 방 안에 서게 만든다. */
-  const FLOOR_Y = 0.62;
-
-  /** 바닥면. 도면에서 평면은 원근선 몇 줄이면 충분하다. */
-  function drawFloorPlane(c, w, h) {
-    const fy = Math.round(h * FLOOR_Y);
+  /**
+   * 게임장 — 【도 1】.
+   *
+   * 층 상승 구조는 걷어냈다. 운동장이든 강당이든, 살아남은 사람들이 같은 자리에서
+   * 계속 겨룬다. 여기서는 구역 상자 아래의 바닥과 소실선만 그린다. 상자와 글자,
+   * 도면부호는 drawZones와 drawSheetFurniture가 그린다 —— 상자 위에 사람이 서야
+   * 하므로 그리는 순서가 나뉘어 있을 뿐이다.
+   */
+  function drawGround(c, w, h) {
+    const fy = Math.round(h * (BOX.bot + 0.045));
     c.strokeStyle = P.ink;
     c.lineWidth = 1;
     c.beginPath();
@@ -195,8 +201,8 @@
     c.lineTo(px(w), px(fy));
     c.stroke();
 
-    // 소실점으로 모이는 바닥선
-    c.strokeStyle = 'rgba(20,20,20,.16)';
+    // 소실점으로 모이는 바닥선. 이게 있어야 아래 무리가 평면 위에 서 있는 것으로 읽힌다.
+    c.strokeStyle = 'rgba(20,20,20,.14)';
     c.lineWidth = 0.6;
     c.beginPath();
     for (let i = 0; i <= 10; i += 1) {
@@ -205,115 +211,6 @@
       c.lineTo(px(bx), px(h));
     }
     c.stroke();
-  }
-
-  function drawLobby(c, w, h) {
-    // 유리벽. 창틀은 실선, 유리는 해칭.
-    c.strokeStyle = P.ink;
-    c.lineWidth = 1;
-    for (let i = 0; i < 5; i += 1) {
-      const x = Math.round(w * (0.06 + i * 0.2));
-      const y = Math.round(h * 0.20);
-      const bw = Math.round(w * 0.10);
-      const bh = Math.round(h * 0.36);
-      c.strokeRect(px(x), px(y), bw, bh);
-      hatch(c, x + 1, y + 1, bw - 2, bh - 2, 7, 0.10, 1);
-    }
-    drawFloorPlane(c, w, h);
-  }
-
-  function drawOffice(c, w, h) {
-    // 천장 조명
-    c.strokeStyle = P.mid;
-    c.lineWidth = 1;
-    c.beginPath();
-    for (let i = 0; i < 7; i += 1) {
-      const x = Math.round(w * (0.05 + i * 0.13));
-      c.moveTo(px(x), px(h * 0.14));
-      c.lineTo(px(x + w * 0.05), px(h * 0.14));
-    }
-    c.stroke();
-    // 파티션. 위에서 본 칸막이라 해칭으로 면을 표시한다.
-    c.strokeStyle = P.ink;
-    for (let i = 0; i < 6; i += 1) {
-      const x = Math.round(w * (0.09 + i * 0.14));
-      const y = Math.round(h * 0.38);
-      const bw = Math.round(w * 0.07);
-      const bh = Math.round(h * 0.22);
-      c.strokeRect(px(x), px(y), bw, bh);
-      hatch(c, x + 1, y + 1, bw - 2, bh - 2, 5, 0.16, 1);
-    }
-    drawFloorPlane(c, w, h);
-  }
-
-  function drawReview(c, w, h, t) {
-    // 위에서 떨어지는 심문등. 사다리꼴 광선을 선으로만 그린다.
-    c.strokeStyle = 'rgba(20,20,20,.35)';
-    c.lineWidth = 0.8;
-    c.beginPath();
-    c.moveTo(px(w * 0.42), px(h * 0.05));
-    c.lineTo(px(w * 0.16), px(h * FLOOR_Y));
-    c.moveTo(px(w * 0.58), px(h * 0.05));
-    c.lineTo(px(w * 0.84), px(h * FLOOR_Y));
-    c.stroke();
-    hatch(c, w * 0.16, h * 0.05, w * 0.68, h * (FLOOR_Y - 0.05), 14, 0.06, 1);
-
-    // 등. 깜빡임은 선 굵기로 표현한다.
-    c.strokeStyle = P.ink;
-    c.lineWidth = Math.sin(t / 700) > -0.2 ? 2.2 : 1;
-    c.beginPath();
-    c.moveTo(px(w * 0.42), px(h * 0.05));
-    c.lineTo(px(w * 0.58), px(h * 0.05));
-    c.stroke();
-    drawFloorPlane(c, w, h);
-  }
-
-  function drawArchive(c, w, h) {
-    c.strokeStyle = P.ink;
-    c.lineWidth = 1;
-    for (let r = 0; r < 3; r += 1) {
-      const y = Math.round(h * (0.24 + r * 0.12));
-      const bh = Math.max(4, Math.round(h * 0.08));
-      c.beginPath();
-      c.moveTo(px(0), px(y));
-      c.lineTo(px(w), px(y));
-      c.stroke();
-      // 책등. 문헌이 꽂힌 서가다.
-      c.lineWidth = 0.7;
-      c.beginPath();
-      for (let i = 0; i < 30; i += 1) {
-        if ((i * 7 + r * 3) % 5 === 0) continue;
-        const bx = Math.round(w * (i / 30)) + 2;
-        c.moveTo(px(bx), px(y - bh));
-        c.lineTo(px(bx), px(y));
-      }
-      c.stroke();
-      c.lineWidth = 1;
-    }
-    drawFloorPlane(c, w, h);
-  }
-
-  function drawDatacenter(c, w, h, t) {
-    for (let i = 0; i < 8; i += 1) {
-      const rx = Math.round(w * (0.04 + i * 0.12));
-      const rw = Math.round(w * 0.07);
-      const ry = Math.round(h * 0.20);
-      const rh = Math.round(h * 0.40);
-      c.strokeStyle = P.ink;
-      c.lineWidth = 1;
-      c.strokeRect(px(rx), px(ry), rw, rh);
-      // 표시등. 켜지면 채워지고 꺼지면 빈 원이다.
-      for (let j = 0; j < 5; j += 1) {
-        const on = (Math.sin(t / 300 + i * 1.7 + j * 0.9) + 1) / 2 > 0.55;
-        const cy = Math.round(h * (0.24 + j * 0.07));
-        const cx2 = rx + rw * 0.5;
-        const rr = Math.max(1.2, rw * 0.09);
-        c.beginPath();
-        c.arc(cx2, cy, rr, 0, 6.283);
-        if (on) { c.fillStyle = P.ink; c.fill(); } else { c.lineWidth = 0.7; c.stroke(); }
-      }
-    }
-    drawFloorPlane(c, w, h);
   }
 
   /**
@@ -503,11 +400,9 @@
       this.n = 0;
 
       this.phase = 'idle';
-      this.floor = 1;
-      this.scene = 'lobby';
+      this.scene = 'ground';
       this.prevScene = null;
       this.sceneT = 1;
-      this.floorScene = 'lobby';   // 옥상에 올라가기 직전의 층. 우승 장면이 끝나면 여기로 돌아온다.
       this.backdrop = null;        // 옥상 배경 사진. 없으면 절차적으로 그린다.
       this.roofStand = ROOF_STAND; // 사진이 난간선을 다르게 선언하면 여기가 따라 움직인다.
       this.alive = 0;
@@ -517,7 +412,6 @@
       this.revealSide = null;
       this.sealAt = null;          // 도장이 찍힌 시각. 눌렸다 떨어지는 맛을 위해 잰다.
       this.championIndex = null;   // 우승 장면 — 이 사람만 옥상에 크게 남는다
-      this.riseT = 1;
       this.t0 = performance.now();
       this.raf = null;
       this.dpr = 1;
@@ -597,19 +491,9 @@
       this.alive = s.alive ?? this.alive;
       this.named = s.named || null;
 
-      // ?scene= 픽스처로 층을 고정한 상태면 서버 값으로 덮어쓰지 않는다
-      if (!this.sceneLocked) {
-        if (s.scene) {
-          this.floorScene = s.scene;
-          // 결과 단계에도 서버는 마지막 층 배경을 계속 보낸다. 우승 장면이 떠 있는 동안
-          // 그걸 그대로 받으면 옥상이 매 틱 층 배경으로 되돌아간다.
-          if (this.championIndex === null) this.toScene(s.scene);
-        }
-        if (typeof s.floor === 'number' && s.floor !== this.floor) {
-          this.floor = s.floor;
-          this.riseT = 0;
-        }
-      }
+      // ?scene= 픽스처로 장면을 고정한 상태면 서버 값으로 덮어쓰지 않는다.
+      // 우승 장면이 떠 있는 동안에는 서버가 보내는 게임장 배경으로 되돌리지 않는다.
+      if (!this.sceneLocked && s.scene && this.championIndex === null) this.toScene(s.scene);
       if (s.aliveMask) this.applyAlive(s.aliveMask);
 
       // 새 문항이 시작되면 살아남은 사람들이 다시 아래 중앙으로 모인다
@@ -651,18 +535,15 @@
       const next = typeof ci === 'number' ? ci : null;
       if (next === this.championIndex) return;
       this.championIndex = next;
-      if (next !== null && !this.sceneLocked) {
-        if (this.scene !== 'rooftop') this.floorScene = this.scene;
-        this.toScene('rooftop');
-      }
+      if (next !== null && !this.sceneLocked) this.toScene('rooftop');
       this.layout();
     }
 
     clearChampion() {
       if (this.championIndex === null) return;
       this.championIndex = null;
-      // 다음 회차는 옥상에서 시작하지 않는다. 올라오기 전 층으로 돌려놓는다.
-      if (!this.sceneLocked && this.scene === 'rooftop') this.toScene(this.floorScene || 'lobby');
+      // 다음 회차는 옥상에서 시작하지 않는다. 게임장으로 돌려놓는다.
+      if (!this.sceneLocked && this.scene === 'rooftop') this.toScene('ground');
       this.layout();
     }
 
@@ -737,7 +618,7 @@
       const gone = [];
       for (const p of this.people) {
         if (!p.alive) { gone.push(p); continue; }
-        // 정답 공개 뒤에는 살아남은 사람이 다음 층의 군중으로 내려온다
+        // 정답 공개 뒤에는 살아남은 사람이 대기 구역으로 내려온다
         if (this.revealSide) zones.home.push(p);
         else if (p.choice === 'O') zones.O.push(p);
         else if (p.choice === 'X') zones.X.push(p);
@@ -759,12 +640,23 @@
         });
       };
 
-      // 발판에 올라선 무리는 조금 더 촘촘히 서서 옆으로 넓게 퍼진다.
-      // 세로로 길어지면 두 진영이 화면 중앙까지 흘러내려 구도가 지저분해진다.
-      const plateTh = Math.max(4, H * 0.014);
+      /** 구역 상자 안에 줄지어 세운다. 첫 줄 발끝이 상자 윗변에서 머리 하나만큼 내려온다. */
+      const placeBox = (list, L, R, topY) => {
+        const g = gap * 0.8;
+        const cols = Math.max(1, Math.floor((R - L - g) / g));
+        list.forEach((p, idx) => {
+          const col = idx % cols;
+          const row = Math.floor(idx / cols);
+          const rowCount = Math.min(cols, list.length - row * cols);
+          const rowW = (rowCount - 1) * g;
+          const jitter = (p.seed - 0.5) * g * 0.35;
+          p.tx = (L + R) / 2 - rowW / 2 + col * g + jitter;
+          p.ty = topY + gap * 1.35 + row * g * 0.8 + (p.seed - 0.5) * g * 0.18;
+        });
+      };
       place(zones.home, W / 2, H * HOME_Y, HOME_W);
-      place(zones.O, W * ZONE_CX_O, H * ZONE_Y + plateTh, ZONE_W, 0.78);
-      place(zones.X, W * ZONE_CX_X, H * ZONE_Y + plateTh, ZONE_W, 0.78);
+      placeBox(zones.O, W * BOX.oL, W * BOX.oR, H * BOX.top);
+      placeBox(zones.X, W * BOX.xL, W * BOX.xR, H * BOX.top);
 
       // 남겨진 사람들은 아래로 흘러 사라진다
       for (const p of gone) { p.ty = Math.max(p.ty, H * 0.95) + H * 0.5; }
@@ -785,7 +677,6 @@
     }
 
     update() {
-      if (this.riseT < 1) this.riseT = Math.min(1, this.riseT + 0.018);
       if (this.sceneT < 1) {
         this.sceneT = Math.min(1, this.sceneT + 0.02);
         if (this.sceneT >= 1) this.prevScene = null;   // 다 넘어왔으면 이전 장면은 버린다
@@ -828,7 +719,7 @@
       const champScene = this.championIndex !== null;
       if (this.showZones && !champScene) this.drawZones(c, W, H, sc);
       this.drawPeople(c, t);
-      if (this.showZones) this.drawFloorTag(c, W, H, sc, champScene);
+      if (this.showZones) this.drawSheetFurniture(c, W, H, sc, champScene);
 
       c.restore();
     }
@@ -851,54 +742,53 @@
     }
 
     /**
-     * O / X 발판.
+     * O / X 구역 — 게임장의 두 상자.
      *
-     * 정답이 공개되면 색이 아니라 판정이 찍힌다 —— 맞은 쪽에는 등록 도장, 틀린 쪽에는
-     * 거절 사선. 이 게임에서 인주가 등장하는 유일한 순간이고, 그래서 그 색이 곧 결과다.
+     * 참여자 화면에서는 이 상자 위에 투명 버튼이 겹친다. 구역이 곧 버튼이다.
+     * 정답이 공개되면 색이 아니라 판정이 찍힌다 —— 맞은 구역에는 등록 도장,
+     * 틀린 구역은 사선으로 지워진다. 인주가 등장하는 유일한 순간이고, 그 색이 곧 결과다.
      */
     drawZones(c, W, H, sc) {
-      const y = H * ZONE_Y;
-      const w = W * ZONE_W;
-      const th = Math.max(3, H * 0.012);
-
       // 도장이 언제 찍혔는지 —— 눌렸다 떨어지는 맛을 주려고 잰다
       if (this.revealSide && this.sealAt === null) this.sealAt = performance.now();
       if (!this.revealSide) this.sealAt = null;
       const since = this.sealAt === null ? undefined : performance.now() - this.sealAt;
 
       for (const side of ['O', 'X']) {
-        const cx = W * (side === 'O' ? ZONE_CX_O : ZONE_CX_X);
+        const L = W * (side === 'O' ? BOX.oL : BOX.xL);
+        const R = W * (side === 'O' ? BOX.oR : BOX.xR);
+        const T = H * BOX.top;
+        const B = H * BOX.bot;
         const hit = this.revealSide === side;
         const miss = this.revealSide && !hit;
-        const bx = cx - w / 2;
+        const cx = (L + R) / 2;
 
-        // 발판. 부호가 붙는 도면 요소다.
+        // 상자. 면은 해칭, 윤곽은 실선 —— 도면의 문법 그대로.
+        // 해칭 방향을 좌우 반대로 두면 두 구역이 같은 무늬로 붙어 보이지 않는다.
+        c.fillStyle = P.paper;
+        c.fillRect(Math.round(L), Math.round(T), Math.round(R - L), Math.round(B - T));
+        hatch(c, L + 1, T + 1, R - L - 2, B - T - 2, 9, miss ? 0.05 : 0.11, side === 'O' ? 1 : -1);
         c.strokeStyle = P.ink;
-        c.lineWidth = 1.4;
-        c.beginPath();
-        c.moveTo(px(bx), px(y));
-        c.lineTo(px(bx + w), px(y));
-        c.stroke();
-        hatch(c, bx, y, w, th, 5, miss ? 0.14 : 0.42, 1);
+        c.lineWidth = hit ? 2.4 : 1.2;
+        c.strokeRect(px(L), px(T), Math.round(R - L), Math.round(B - T));
 
-        // 글자는 발판 위에 크게. 사람이 발판 아래에 서므로 가려지지 않는다.
+        // 글자는 상자 가운데 크게, 옅게. 사람들이 그 위에 서므로 바닥 무늬처럼 깔린다.
         c.textAlign = 'center';
-        c.textBaseline = 'alphabetic';
-        c.font = `400 ${Math.round(clamp(H * 0.17, 12, 76))}px "Nanum Myeongjo", Batang, 바탕, serif`;
-        c.fillStyle = miss ? 'rgba(20,20,20,.22)' : P.ink;
-        c.fillText(side, cx, y - H * 0.035);
+        c.textBaseline = 'middle';
+        c.font = `400 ${Math.round(clamp((B - T) * 0.55, 22, 220))}px "Nanum Myeongjo", Batang, 바탕, serif`;
+        c.fillStyle = miss ? 'rgba(20,20,20,.08)' : 'rgba(20,20,20,.20)';
+        c.fillText(side, cx, (T + B) / 2 + (B - T) * 0.03);
 
         if (miss) {
-          // 거절 —— 사선으로 지운다
+          // 거절 —— 상자를 사선으로 지운다
           c.strokeStyle = P.seal;
-          c.lineWidth = Math.max(1.5, H * 0.008);
-          const s = H * 0.075;
+          c.lineWidth = Math.max(1.5, H * 0.006);
           c.beginPath();
-          c.moveTo(cx - s, y - H * 0.13);
-          c.lineTo(cx + s, y - H * 0.005);
+          c.moveTo(px(L + (R - L) * 0.05), px(B - (B - T) * 0.07));
+          c.lineTo(px(R - (R - L) * 0.05), px(T + (B - T) * 0.07));
           c.stroke();
         } else if (hit) {
-          seal(c, cx + w * 0.30, y - H * 0.085, Math.max(9, H * 0.052), '登', since);
+          seal(c, R - (R - L) * 0.15, T + (B - T) * 0.22, Math.max(10, H * 0.055), '登', since);
         }
       }
     }
@@ -1068,8 +958,13 @@
       c.stroke();
     }
 
-    /** 도면 번호와 쪽번호. 공보의 머리와 발이다. */
-    drawFloorTag(c, W, H, sc, champScene) {
+    /**
+     * 도면 가구 — 캡션, 도면부호 지시선, 부호의 설명, 쪽번호.
+     *
+     * 상자와 사람만 있으면 그냥 다이어그램이다. 【도 N】 캡션과 숫자 부호,
+     * 지시선, 부호의 설명이 붙어야 명세서의 도면이 된다.
+     */
+    drawSheetFurniture(c, W, H, sc, champScene) {
       const s = Math.max(7, Math.round(Math.min(W, H) * 0.045));
       const m = Math.max(5, Math.round(Math.min(W, H) * 0.022));
 
@@ -1077,38 +972,29 @@
       c.textBaseline = 'top';
       c.fillStyle = P.ink;
       c.font = `500 ${s}px "Nanum Myeongjo", Batang, 바탕, serif`;
-      c.fillText(`【도 ${sc.no}】 ${sc.caption}`, m + s * 0.5, m + s * 0.4);
+      c.fillText(`【도 ${sc.no}】 ${sc.caption}`, m + s * 0.5, m + s * 0.35);
 
       // 쪽번호 — 공보는 늘 아래 가운데에 - N - 이 있다
       c.textAlign = 'center';
       c.textBaseline = 'bottom';
       c.fillStyle = P.mid;
-      c.font = `${Math.max(6, s * 0.8)}px ui-monospace, monospace`;
-      c.fillText(champScene ? `- ${sc.label} -` : `- ${this.floor} -`, W / 2, H - m - 2);
-    }
+      c.font = `${Math.max(6, s * 0.75)}px ui-monospace, monospace`;
+      c.fillText(`- ${sc.no} -`, W / 2, H - m - 2);
 
-    /** 미니 타워 — 지금 몇 층인지. 지나온 층은 해칭, 지금 층은 채운다. */
-    drawTower(ctx, x, y, w, h, maxFloor) {
-      const floors = Math.max(6, maxFloor);
-      const fh = h / floors;
-      for (let f = 1; f <= floors; f += 1) {
-        const fy = y + h - f * fh;
-        const here = f === this.floor;
-        ctx.strokeStyle = P.ink;
-        ctx.lineWidth = 0.9;
-        ctx.strokeRect(px(x), px(fy + 2), Math.round(w), Math.round(fh - 4));
-        if (here) {
-          ctx.fillStyle = P.ink;
-          ctx.fillRect(px(x), px(fy + 2), Math.round(w), Math.round(fh - 4));
-          ctx.fillStyle = P.paper;
-          ctx.font = `700 ${Math.min(13, fh * 0.6)}px ui-monospace, monospace`;
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'alphabetic';
-          ctx.fillText(`${f}F`, x + w / 2, fy + fh * 0.68);
-        } else if (f < this.floor) {
-          hatch(ctx, x + 1, fy + 3, w - 2, fh - 6, 4, 0.30, 1);
-        }
-      }
+      if (champScene || this.scene !== 'ground') return;
+
+      // 도면부호 지시선. 상자 사이 빈 하늘과 대기 구역 옆이 부호의 자리다.
+      const cs = Math.max(7, Math.round(Math.min(W, H) * 0.042));
+      callout(c, '10', W * 0.36, H * BOX.top, W * 0.425, H * 0.055, cs);
+      callout(c, '20', W * 0.64, H * BOX.top, W * 0.575, H * 0.055, cs);
+      callout(c, '30', W * 0.68, H * 0.815, W * 0.80, H * 0.72, cs);
+
+      // 부호의 설명 — 도면 아래에 늘 붙는 한 줄
+      c.textAlign = 'left';
+      c.textBaseline = 'bottom';
+      c.fillStyle = P.mid;
+      c.font = `${Math.max(6, cs * 0.8)}px ui-monospace, monospace`;
+      c.fillText('10 O 구역   20 X 구역   30 응답 대기', m + s * 0.5, H - m - 2);
     }
   }
 

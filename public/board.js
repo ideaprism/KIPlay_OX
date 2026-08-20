@@ -30,11 +30,6 @@ function fmtClock(ms) {
   return `${pad2(Math.floor(s / 60))}:${pad2(s % 60)}`;
 }
 
-const SCENE_KO = {
-  lobby: '로비', office: '사무실', review: '심사실',
-  archive: '서고', datacenter: '전산실', rooftop: '옥상',
-};
-
 // ─────────────────────────────────────────── 엔딩 카드
 //
 // 전광판이 진짜 쇼다. 참여자 화면보다 오래 머문다.
@@ -79,7 +74,6 @@ function playEnding(s) {
     dept: r.champion.dept,
     survived: r.champion.survived,
     isNew: r.champion.isNew,
-    floor: r.floor,
     totalPlayers: r.totalPlayers,
   }, buildGazette(s, r)));
 }
@@ -91,29 +85,17 @@ function initStage() {
   stage.setBackdrop(window.ROOF_BACKDROP_CONFIG);
   stage.start();
 
-  // 층 환경 확인용 픽스처. 서버 없이 각 층을 바로 볼 수 있다.
-  //   /board.html?scene=datacenter   lobby | office | review | archive | datacenter | rooftop
+  // 장면 확인용 픽스처. 서버 없이 바로 볼 수 있다.
+  //   /board.html?scene=ground   ground | rooftop
   const forced = new URLSearchParams(location.search).get('scene');
   if (forced && CROWD_SCENES[forced]) {
     stage.scene = forced;
     stage.sceneT = 1;
     stage.sceneLocked = true;   // 서버 상태가 덮어쓰지 못하게 잠근다
-    stage.floor = { lobby: 1, office: 2, review: 3, archive: 4, datacenter: 5, rooftop: 6 }[forced] || 1;
     sceneLocked = true;
   }
 }
 
-function drawTower() {
-  const cv = $('tower-canvas');
-  const r = cv.getBoundingClientRect();
-  const dpr = Math.min(2, window.devicePixelRatio || 1);
-  cv.width = Math.round(r.width * dpr);
-  cv.height = Math.round(r.height * dpr);
-  const c = cv.getContext('2d');
-  c.setTransform(dpr, 0, 0, dpr, 0, 0);
-  c.clearRect(0, 0, r.width, r.height);
-  if (stage) stage.drawTower(c, 0, 0, r.width, r.height, 6);
-}
 
 // ─────────────────────────────────────────── 타이머 루프
 
@@ -289,14 +271,6 @@ function render(s) {
   $('b-joined').textContent = s.joined;
   $('b-q').textContent = s.qIndex >= 0 ? `${pad2(s.qIndex + 1)} / ${pad2(s.qTotal)}` : '— / —';
   $('b-alive').textContent = s.alive;
-  if (!sceneLocked) {
-    $('t-floor').textContent = `${s.floor || 1}F`;
-    $('t-scene').textContent = SCENE_KO[s.scene] || '';
-  } else {
-    $('t-floor').textContent = `${stage.floor}F`;
-    $('t-scene').textContent = SCENE_KO[stage.scene] || '';
-  }
-  drawTower();
 
   if (s.vip) {
     $('b-vip').hidden = false;
@@ -321,7 +295,6 @@ function render(s) {
       $('b-center-label').textContent = '대기 중';
       $('b-center-big').textContent = '12:55';
       $('b-center-big').className = 'huge mono';
-      $('b-center-floor').hidden = true;
       $('b-center-sub').textContent = '매주 월요일 점심시간 마지막 5분';
       $('b-center-list').hidden = true;
       lastQIndex = -1;
@@ -334,7 +307,6 @@ function render(s) {
       $('b-center-label').textContent = '시작까지';
       $('b-center-big').className = 'huge mono';
       $('b-center-big').textContent = fmtClock(s.phaseEndsAt - now());
-      $('b-center-floor').hidden = true;
       $('b-center-sub').textContent = `${s.joined}명 입장`;
       $('b-center-list').hidden = true;
       endingDone = false;   // 다음 회차의 엔딩을 위해 되돌린다
@@ -392,11 +364,8 @@ function render(s) {
       $('b-center-big').textContent = r && r.champion ? r.champion.name : '챔피언 없음';
 
       if (r && r.champion) {
-        $('b-center-floor').hidden = false;
-        $('b-center-floor').textContent = `${r.floor}층에서 우승`;
         $('b-center-sub').textContent = `${r.champion.dept} · ${r.champion.survived}문항 생존 · 총 ${r.totalPlayers}명 참가`;
       } else {
-        $('b-center-floor').hidden = true;
         $('b-center-sub').textContent = '아무도 끝까지 살아남지 못했습니다.';
       }
 
@@ -465,4 +434,3 @@ $('audio-go').addEventListener('click', () => {
 initStage();
 connect();
 startLoop();
-window.addEventListener('resize', drawTower);

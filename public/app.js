@@ -102,7 +102,6 @@ function playEnding(s) {
     dept: r.champion.dept,
     survived: r.champion.survived,
     isNew: r.champion.isNew,
-    floor: r.floor,
     totalPlayers: r.totalPlayers,
   }, buildGazette(s, r)));
 }
@@ -737,8 +736,10 @@ function openSpec() {
   // 화면 크기를 못 읽는 환경이 있다. 그때 음수 좌표가 나오면 창이 화면 밖에서 열린다.
   const sw = window.screen && window.screen.availWidth ? window.screen.availWidth : 1280;
   const sh = window.screen && window.screen.availHeight ? window.screen.availHeight : 900;
-  const w = Math.min(960, Math.max(360, Math.round(sw * 0.62)));
-  const h = Math.min(1040, Math.max(480, Math.round(sh * 0.88)));
+  // 명세서는 창에 맞춰 배율이 잡히므로, 창을 1.5배 키우는 것이 곧 지면을 150%로 보는 것이다.
+  // 화면보다 커질 수는 없으니 화면 크기에서 잘린다.
+  const w = Math.min(sw - 16, Math.max(360, Math.round(sw * 0.62 * 1.5)), 1460);
+  const h = Math.min(sh - 16, Math.max(480, Math.round(sh * 0.88 * 1.5)), 1560);
   const left = Math.max(0, Math.round((sw - w) / 2));
   const top = Math.max(0, Math.round((sh - h) / 2));
   const win = window.open(
@@ -859,7 +860,7 @@ if (fixture) {
       div: '012345012345', flags: 'v...n....n..',
     };
     demo.result = {
-      floor: 6, scene: 'rooftop',
+      scene: 'rooftop',
       champion: { name: '조새싹', dept: '정보서비스실', div: 'sys', ci: 4, isNew: true, survived: 5 },
       ranking: [
         { rank: 1, name: '조새싹', dept: '정보서비스실', survived: 5, points: 105, isNew: true, vip: false },

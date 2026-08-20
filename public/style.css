@@ -509,7 +509,7 @@ body[data-demo="1"] .screen {
 .crowd-box {
   flex: 1 1 auto;
   min-height: 150px;
-  border-radius: 10px;
+  border-radius: 2px;   /* 도면에 둥근 모서리는 없다 */
   overflow: hidden;
   background: var(--surface);
   border: 1px solid var(--line);
@@ -692,81 +692,58 @@ body[data-demo="1"] .screen {
 .send-state[data-s="pending"] { color: var(--amber); }
 .send-state[data-s="fail"] { color: var(--out); font-weight: 700; }
 
-/* ─────────────────────────────────────────────── O / X 버튼 */
+/* ─────────────────────────────────────────────── O / X 게임장 */
 
-.choices {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  flex: 0 0 auto;
-  height: clamp(140px, 26vh, 220px);
+/* ── 게임장 = 버튼 ─────────────────────────────────────────────
+   캔버스가 O·X 구역 상자를 그리고, 이 투명 버튼들이 그 위에 겹친다.
+   좌표는 crowd.js의 BOX 상수와 같은 비율 — 어긋나면 누른 곳과 반응하는 곳이 갈린다. */
+.stage-wrap {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
 }
+.stage-main { flex: 1 1 auto; min-height: 260px; }
 
 .choice {
-  position: relative;
-  border-radius: 2px;
-  display: grid;
-  place-items: center;
-  overflow: hidden;
-  background: var(--surface-2);
-  border: 1.5px solid var(--ink);
-  box-shadow: none;
-  transition: transform var(--t-press) var(--ease-out-soft),
-              background-color var(--t-control) var(--ease-out),
-              border-color var(--t-control) var(--ease-out);
-}
-
-/* 도면의 면은 해칭이다. 그라디언트도 광택도 없다. */
-.choice::after {
-  content: "";
   position: absolute;
-  inset: 3px;
-  background: repeating-linear-gradient(
-    -45deg, rgba(20, 20, 20, 0.055) 0 1px, transparent 1px 6px);
-  pointer-events: none;
+  top: 11.5%;
+  height: 48.5%;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  cursor: pointer;
 }
+.choice-o { left: 3.5%; width: 45%; }
+.choice-x { left: 51.5%; width: 45%; }
 
-.choice .glyph {
-  font-family: var(--serif);
-  font-size: clamp(56px, 17vw, 92px);
-  font-weight: 400;
-  line-height: 1;
-  color: var(--ink);
-  transition: color var(--t-control) var(--ease-out);
-}
+.choice:focus-visible { outline: 2.5px solid var(--ink); outline-offset: -2.5px; }
+.choice:active { background: rgba(20, 20, 20, 0.045); }
 
-.choice:active { transform: translateY(1px); }
-
-/* 선택 상태 — 제출 도장을 찍은 것처럼 겹테두리가 생긴다 */
+/* 제출 — 내가 고른 구역에 인주 겹테두리가 감긴다. 도장 틀에 끼운 것처럼. */
 .choice[aria-pressed="true"] {
-  border-color: var(--amber);
-  box-shadow: inset 0 0 0 3px var(--surface-2), inset 0 0 0 4.5px var(--amber);
+  box-shadow: inset 0 0 0 2.5px var(--amber), inset 0 0 0 5px var(--surface-2), inset 0 0 0 6.5px var(--amber);
 }
-.choice[aria-pressed="true"] .glyph { color: var(--amber); }
 
 /* 접수 순간 한 번. 도장이 눌렸다 떨어지는 움직임이다. */
 .choice.burst { animation: burst 420ms var(--ease-out-hard); }
 
 @keyframes burst {
-  0%   { transform: scale(1.03); }
-  40%  { transform: scale(0.985); }
+  0%   { transform: scale(1.02); }
+  40%  { transform: scale(0.99); }
   100% { transform: scale(1); }
 }
 
-/* 등록 — 굵은 겹테두리. 거절 — 해칭으로 지운다. */
-.choice.correct {
-  border-color: var(--ink);
-  border-width: 3px;
-  background: var(--surface-2);
-}
-.choice.correct .glyph { color: var(--ink); }
-
-.choice.wrong { opacity: 1; border-color: var(--line-2); }
-.choice.wrong::after {
+/* 브리핑 중에는 구역이 잠긴다 — 해칭 장막이 덮인다 */
+.choice.arming {
+  cursor: default;
   background: repeating-linear-gradient(
-    -45deg, rgba(20, 20, 20, 0.24) 0 1.5px, transparent 1.5px 7px);
+    -45deg, rgba(20, 20, 20, 0.05) 0 2px, rgba(250, 247, 240, 0.55) 2px 8px);
 }
-.choice.wrong .glyph { color: var(--ink-3); }
+
+/* 판정은 캔버스가 그린다 — 등록 도장과 거절 사선. 버튼은 비켜선다. */
+.choice.correct, .choice.wrong { box-shadow: none; }
 
 /* ─────────────────────────────────────────────── 정답 공개 */
 

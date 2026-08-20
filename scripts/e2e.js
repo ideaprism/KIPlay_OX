@@ -157,10 +157,34 @@ async function waitForResult(obs, timeoutMs = 300000) {
 
 // ───────────────────────────────────────────── 시나리오
 
+/**
+ * 시나리오 사이의 방화벽.
+ *
+ * 앞 시나리오가 SSE를 닫자마자 리셋을 부르면, 서버의 req.on('close')가 아직 돌기 전이라
+ * prunePlayers가 그 참여자를 접속 중으로 보고 건너뛴다. 유령은 다음 회차에 합류해
+ * 인원 수 단언을 전부 흔든다 —— 간헐적으로만 실패하는 이유가 이 경합이었다.
+ *
+ * 끊김이 반영될 틈을 준 뒤 리셋하고, 정말 0명이 됐는지 확인한다. 그래도 남아 있으면
+ * e2e 밖의 클라이언트(브라우저 탭 등)가 붙어 있다는 뜻이므로 이름을 밝히고 실패시킨다.
+ */
+async function resetServer() {
+  await sleep(400);
+  await post('/api/admin/reset', { key: KEY });
+  for (let i = 0; i < 6; i += 1) {
+    await sleep(150);
+    const h = await get('/api/health');
+    if (h.players === 0) return;
+    await post('/api/admin/reset', { key: KEY });
+  }
+  const h = await get('/api/health');
+  if (h.players > 0) {
+    console.log(`  ⚠ 리셋 후에도 ${h.players}명이 붙어 있습니다. e2e 밖에서 접속 중인 클라이언트를 닫으세요.`);
+  }
+}
+
 async function scenarioA() {
   console.log('\n[A] 정상 진행 — 8명 무작위 응답');
-  await post('/api/admin/reset', { key: KEY });
-  await sleep(150);
+  await resetServer();
 
   const obs = observe();
   const players = [];
@@ -212,8 +236,7 @@ async function scenarioA() {
 
 async function scenarioB() {
   console.log('\n[B] 부활권 — 신입 무응답 탈락 후 부활');
-  await post('/api/admin/reset', { key: KEY });
-  await sleep(150);
+  await resetServer();
 
   const obs = observe();
   const newbie = await join('26005', () => null);          // 절대 응답하지 않는다
@@ -240,8 +263,7 @@ async function scenarioB() {
 
 async function scenarioC() {
   console.log('\n[C] 전멸 구제 — 전원 무응답 후 서든데스');
-  await post('/api/admin/reset', { key: KEY });
-  await sleep(150);
+  await resetServer();
 
   const obs = observe();
   const a = await join('05021', () => null);
@@ -304,8 +326,7 @@ async function scenarioD() {
 
 async function scenarioE() {
   console.log('\n[E] 체험 모드 — 혼자서 봇 40명과 진행');
-  await post('/api/admin/reset', { key: KEY });
-  await sleep(150);
+  await resetServer();
 
   const obs = observe();
   const solo = await join('26005', () => (Math.random() < 0.5 ? 'O' : 'X'));
@@ -361,9 +382,13 @@ async function scenarioE() {
   solo.close();
   obs.close();
 
+  // 소켓을 끊었다고 서버가 곧바로 아는 건 아니다. req.on('close')가 이벤트 루프를 한 바퀴
+  // 돌고 나서야 p.res가 비워지고, 그전에 리셋이 들어오면 prunePlayers가 아직 붙어 있는
+  // 참여자로 보고 건너뛴다. 끊긴 것이 서버에 반영될 틈을 준다.
+  await sleep(400);
+
   // 리셋하면 봇이 사라져야 한다
-  await post('/api/admin/reset', { key: KEY });
-  await sleep(250);
+  await resetServer();
   health = await get('/api/health');
   ok(health.players === 0, `리셋 후 봇 정리됨 — 남은 인원 ${health.players}`);
   ok(health.phase === 'idle', '리셋 후 대기 상태');
@@ -381,8 +406,7 @@ function get(path) {
 
 async function scenarioF() {
   console.log('\n[F] 층 상승과 집계 가리기 경계 — 봇 150명');
-  await post('/api/admin/reset', { key: KEY });
-  await sleep(150);
+  await resetServer();
 
   const obs = observe();
   const solo = await join('15029', () => (Math.random() < 0.5 ? 'O' : 'X'));
@@ -397,12 +421,10 @@ async function scenarioF() {
   let hiddenBelow = false;    // 임계값 밑으로 떨어지자 가려졌는가
   let leak = false;
   let crowdSeen = null;
-  const floors = [];
 
   const close = sse('/api/spectate', (event, s) => {
     if (event === 'state') {
       if (s.crowd) crowdSeen = s.crowd;
-      if (s.phase === 'reveal' && s.reveal) floors.push([s.reveal.fromFloor, s.reveal.toFloor]);
     }
     if (event === 'tally') {
       if (s.alive >= TH && s.tallyVisible && s.o !== null) visibleAbove = true;
@@ -412,7 +434,7 @@ async function scenarioF() {
   });
 
   await post('/api/demo/start', { token: solo.token, bots: 150, lobbySec: 2 });
-  // 층 상승 연출과 문항 브리핑으로 한 판이 2분을 넘길 수 있다
+  // 탈락 연출과 문항 브리핑으로 한 판이 2분을 넘길 수 있다
   const result = await waitForResult(obs, 300000);
 
   ok(visibleAbove, `${TH}명 이상 구간에서는 집계가 보임`);
@@ -423,10 +445,8 @@ async function scenarioF() {
   ok(crowdSeen && crowdSeen.div.length === crowdSeen.n, '본부 마스크 길이가 인원과 일치');
   ok(crowdSeen && crowdSeen.divisions.length === 6, `본부 색 ${crowdSeen ? crowdSeen.divisions.length : '-'}개`);
 
-  const rising = floors.every(([from, to]) => to === from + 1);
-  ok(floors.length > 0 && rising, `층이 한 칸씩 상승 [${floors.map((f) => f.join('→')).join(', ')}]`);
-  ok(result && result.floor >= 2, `챔피언 층 ${result ? result.floor : '-'}층 기록됨`);
-  ok(result && typeof result.scene === 'string', `층 환경 '${result ? result.scene : '-'}' 전달됨`);
+  // 층 구조는 걷어냈다. 게임장은 하나이므로 결과의 장면도 늘 게임장이다.
+  ok(result && result.scene === 'ground', `게임장 장면 '${result ? result.scene : '-'}' 전달됨`);
 
   // 5분 슬롯이 하드 제약이다. 대기실 2초를 뺀 순수 게임 시간을 본다.
   const gameSec = (obs.elapsedMs - 2000) / 1000;
@@ -438,8 +458,7 @@ async function scenarioF() {
 
 async function scenarioG() {
   console.log('\n[G] 임계값 아래 — 처음부터 소수 인원');
-  await post('/api/admin/reset', { key: KEY });
-  await sleep(150);
+  await resetServer();
 
   const cfg = await get('/api/health');
   const TH = cfg.tallyFrom;

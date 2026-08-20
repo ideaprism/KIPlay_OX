@@ -34,7 +34,7 @@
   }
   /* 대각선 워터마크 — 종이 위에 아주 흐리게 찍힌다 */
   .page::before {
-    content: "KIPI e-sports KIPlay\A Be the MOM";
+    content: "KIPI e-sports\A Be the MOM!\A KIPlay";
     white-space: pre;
     position: absolute; inset: 0;
     display: flex; align-items: center; justify-content: center;
@@ -43,7 +43,7 @@
     font-weight: 800;
     font-size: 46px; line-height: 2; text-align: center;
     letter-spacing: 4px;
-    color: rgba(23, 63, 107, .066);
+    color: rgba(23, 63, 107, .11);
     pointer-events: none;
   }
 
@@ -94,6 +94,11 @@
   svg text { font-family: "Malgun Gothic", "맑은 고딕", sans-serif; }
 
   .pageno { position: absolute; bottom: 14px; left: 0; right: 0; text-align: center; font-size: 11.5px; }
+  .credit {
+    position: absolute; bottom: 14px; right: 44px;
+    font-family: "Malgun Gothic", "맑은 고딕", sans-serif;
+    font-size: 9px; letter-spacing: .04em; color: #8A8175;
+  }
 
   /* ── 본문(2면) ── */
   .runhead { text-align: right; font-size: 11px; letter-spacing: 1px; }
@@ -114,7 +119,7 @@
   <!-- ═════════ 1면: 서지 · 명칭 · 요약 · 대표도 ═════════ -->
   <section class="page">
     <div class="topline gothic num">
-      <span class="docno">등록특허 10-1255000</span>
+      <span class="docno">등록특허 10-12:55:00</span>
       <img src="spec-qr.png" alt="QR">
     </div>
     <hr class="rule-bold">
@@ -127,7 +132,7 @@
       </div>
       <table class="dates num"><tbody>
         <tr><td>(45) 공고일자</td><td>2026년08월24일 월요일 12시55분</td></tr>
-        <tr><td>(11) 등록번호</td><td>10-1255000</td></tr>
+        <tr><td>(11) 등록번호</td><td>10-12:55:00</td></tr>
         <tr><td>(24) 등록일자</td><td>2026년08월19일</td></tr>
       </tbody></table>
     </div>
@@ -139,7 +144,7 @@
         <p class="ind"><span class="ipc">A63F 13/30</span> (2026.01)&nbsp;&nbsp;<span class="ipc">A63F 13/46</span> (2026.01)</p>
         <p>(52) CPC특허분류</p>
         <p class="ind"><span class="ipc">A63F 13/46</span> (2026.01)</p>
-        <p class="kv"><span>(21) 출원번호</span><b>10-2026-0125500</b></p>
+        <p class="kv"><span>(21) 출원번호</span><b>10-2026-12:55:00</b></p>
         <p class="kv"><span>(22) 출원일자</span><b>2026년08월15일</b></p>
         <p class="kv"><span style="padding-left:22px">심사청구일자</span><b>2026년08월15일</b></p>
         <p>(56) 선행기술조사문헌</p>
@@ -149,14 +154,14 @@
       <div class="col">
         <p>(73) 특허권자</p>
         <p class="ind"><b>한국특허정보원</b></p>
-        <p class="ind">대전광역시 서구 둔산서로 137, 5층 (둔산동,<br>케이디비빌딩)</p>
-        <p>(72) 발명자</p>
+        <p class="ind">서울 강남구 테헤란로 131,<br>한국지식재산센터 7층</p>
+        <p>(72) 개발자</p>
         <p class="ind"><b>정창균</b></p>
         <p class="ind"><b>서혜연</b></p>
         <p class="ind"><b>박상윤</b></p>
         <p class="ind"><b>고나래</b></p>
         <p>(74) 대리인</p>
-        <p class="ind"><b>없음 (직접 출원)</b></p>
+        <p class="ind"><b>없음 (직접 개발)</b></p>
       </div>
     </div>
 
@@ -173,8 +178,8 @@
       <p class="abstract num">
         본 발명은 매주 월요일 12시 55분에 개시되는 실시간 생존 판정 시스템에 관한 것이다.
         참가자(100)가 동일한 지문을 동시에 수신하고 10초 이내에 O 간판(10) 또는 X 간판(20)을
-        향하여 신호를 제출하면, 서버가 정답 측 참가자(100)를 층(30)의 한 층 위로 상승시키고
-        오답 측 참가자(100)를 해당 층(30)에 잔류시키는 판정을 반복 수행하며, 그 경과는
+        향하여 신호를 제출하면, 서버가 정답 측 참가자(100)를 게임장(30)에 잔류시키고
+        오답 측 참가자(100)를 게임장(30)에서 퇴장시키는 판정을 반복 수행하며, 그 경과는
         전광판(40)과 중계 자막(50)을 통하여 실시간으로 방송된다. 생존자가 1인이 되는 즉시
         절차를 종료하고 그 1인에게 등록결정을 내린다. 본 발명에 의하면 점심시간 마지막 5분
         내에 챔피언 1인의 설정등록이 완료되는 효과가 있다.
@@ -234,11 +239,12 @@
     </div>
 
     <div class="pageno num">- 1 -</div>
+    <div class="credit">created by KIPlay</div>
   </section>
 
   <!-- ═════════ 2면: 명세서 본문 (1단 · 문단번호 · 분홍 표제) ═════════ -->
   <section class="page">
-    <div class="runhead gothic num">등록특허 10-1255000</div>
+    <div class="runhead gothic num">등록특허 10-12:55:00</div>
 
     <div class="body2 num">
       <div class="h1 pink">명 세 서</div>
@@ -246,8 +252,8 @@
 
       <div class="claim-no">청구항 1</div>
       <p>참가자(100) 단말로부터 10초 이내에 O 또는 X 신호를 수신하는 단계;</p>
-      <p>정답 측 참가자(100)의 바닥을 갈라 층(30)의 한 층 위로 상승시키고, 오답 측 참가자(100)를
-      해당 층(30)에 잔류시키는 단계; 및</p>
+      <p>정답 측 참가자(100)를 게임장(30)에 잔류시키고, 오답 측 참가자(100)를
+      게임장(30)에서 퇴장시키는 단계; 및</p>
       <p>생존자가 1인이 되는 즉시 잔여 문항과 무관하게 절차를 종료하는 단계를 포함하는 것을
       특징으로 하는 실시간 생존 판정 방법.</p>
 
@@ -292,28 +298,54 @@
 
       <div class="h2 pink">부호의 설명</div>
       <div class="marks">
-        <p><span>10 : O 간판</span><span>20 : X 간판</span><span>30 : 층 (생존 무대)</span></p>
+        <p><span>10 : O 간판</span><span>20 : X 간판</span><span>30 : 게임장 (생존 무대)</span></p>
         <p><span>40 : 전광판</span><span>50 : 중계 자막</span><span>100 : 참가자</span></p>
-        <p><span>110 : 새싹 배지 (재심사 청구권)</span><span>120 : 왕관 배지 (원장님)</span><span>130 : 흰 링 (본인)</span></p>
+        <p><span>110 : 새싹 배지 (재심사 청구권)</span><span>120 : 왕관 배지 (스페셜 참가자)</span><span>130 : 흰 링 (본인)</span></p>
       </div>
 
       <hr class="rule-bold" style="margin-top:10px">
     </div>
 
     <div class="pageno num">- 2 -</div>
+    <div class="credit">created by KIPlay</div>
   </section>
 
 </div></div>
 
 <script>
 'use strict';
-/* 와이드 모니터 한 화면에 두 면이 다 들어오도록 펼침 전체를 배율 조정한다. */
+/* 와이드 모니터에서는 두 면이 한 화면에 다 들어오도록 펼침 전체를 배율 조정한다.
+ *
+ * 좁은 화면(폰)은 다르다. 두 면을 같이 맞추면 종이가 우표만 해지고 화면 대부분이
+ * 검은 여백이 된다. 그래서 세로로 쌓고 1면이 화면 폭에 꽉 차게 맞춘 뒤,
+ * 아래로 스크롤해 다음 면을 읽게 한다. 종이 문서를 폰으로 보는 자연스러운 방식이다. */
 (function () {
   const zoom = document.getElementById('zoom');
-  const W = 640 * 2 + 28 + 48;
-  const H = 905 + 48;
+  const spread = document.querySelector('.spread');
+  const PAGE_W = 640;
+  const PAD = 48;
+
   function fit() {
     if (!window.innerWidth || !window.innerHeight) return; // 숨겨진 창에서 scale(0)이 되는 것 방지
+    const narrow = window.innerWidth < 720;
+    spread.style.flexDirection = narrow ? 'column' : 'row';
+    document.body.style.overflow = narrow ? 'auto' : 'hidden';
+
+    if (narrow) {
+      const s = window.innerWidth / (PAGE_W + PAD);
+      zoom.style.transform = `scale(${s})`;
+      zoom.style.left = '0px';
+      zoom.style.top = '0px';
+      // transform은 레이아웃 크기를 안 바꾼다. 스크롤 범위를 배율에 맞춰 잡아준다.
+      zoom.style.width = (PAGE_W + PAD) + 'px';
+      document.body.style.height = (spread.offsetHeight * s) + 'px';
+      return;
+    }
+
+    const W = PAGE_W * 2 + 28 + PAD;
+    const H = 905 + PAD;
+    document.body.style.height = '';
+    zoom.style.width = '';
     const s = Math.min(window.innerWidth / W, window.innerHeight / H);
     zoom.style.transform = `scale(${s})`;
     zoom.style.left = Math.max(0, (window.innerWidth - W * s) / 2) + 'px';
