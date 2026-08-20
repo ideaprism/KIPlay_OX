@@ -22,6 +22,21 @@
   }
   #zoom { transform-origin: top left; position: absolute; }
   .spread { display: flex; gap: 28px; padding: 24px; }
+  /* 슬라이드 래퍼. 데스크톱에서는 없는 것처럼(contents) 동작하고,
+     폰에서는 한 화면 = 한 페이지가 되도록 JS가 뷰포트 크기를 입힌다. */
+  .slide { display: contents; }
+  body.paged { overflow-y: auto; }
+  body.paged #zoom { position: static; transform: none !important; }
+  body.paged .spread { flex-direction: column; gap: 0; padding: 0; }
+  body.paged .slide {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;           /* 종이의 레이아웃 상자가 넘쳐 스크롤 꼬리를 만들지 않게 */
+    scroll-snap-align: start;
+    scroll-snap-stop: always;   /* 한 번의 스와이프에 한 장씩. 두 장을 건너뛰지 않는다. */
+  }
+  body.paged .page { flex: 0 0 auto; }
 
   .page {
     width: 640px; height: 905px;            /* A4 비율 */
@@ -115,6 +130,7 @@
 </head>
 <body>
 <div id="zoom"><div class="spread">
+<div class="slide">
 
   <!-- ═════════ 1면: 서지 · 명칭 · 요약 · 대표도 ═════════ -->
   <section class="page">
@@ -243,6 +259,8 @@
   </section>
 
   <!-- ═════════ 2면: 명세서 본문 (1단 · 문단번호 · 분홍 표제) ═════════ -->
+</div>
+<div class="slide">
   <section class="page">
     <div class="runhead gothic num">등록특허 10-12:55:00</div>
 
@@ -310,46 +328,68 @@
     <div class="credit">created by KIPlay</div>
   </section>
 
+</div>
 </div></div>
 
 <script>
 'use strict';
 /* 와이드 모니터에서는 두 면이 한 화면에 다 들어오도록 펼침 전체를 배율 조정한다.
  *
- * 좁은 화면(폰)은 다르다. 두 면을 같이 맞추면 종이가 우표만 해지고 화면 대부분이
- * 검은 여백이 된다. 그래서 세로로 쌓고 1면이 화면 폭에 꽉 차게 맞춘 뒤,
- * 아래로 스크롤해 다음 면을 읽게 한다. 종이 문서를 폰으로 보는 자연스러운 방식이다. */
+ * 좁은 화면(폰)은 다르다. 두 면을 같이 맞추면 종이가 우표만 해진다. 그래서
+ * 한 화면에 한 페이지가 통째로 들어오는 배율로 맞추고, 스크롤 스냅으로
+ * 스와이프 한 번에 한 장씩 넘어가게 한다. 책장을 넘기는 감각이다. */
 (function () {
   const zoom = document.getElementById('zoom');
   const spread = document.querySelector('.spread');
   const PAGE_W = 640;
   const PAD = 48;
 
+  const PAGE_H = 905;
+  const slides = Array.from(document.querySelectorAll('.slide'));
+
   function fit() {
     if (!window.innerWidth || !window.innerHeight) return; // 숨겨진 창에서 scale(0)이 되는 것 방지
     const narrow = window.innerWidth < 720;
-    spread.style.flexDirection = narrow ? 'column' : 'row';
-    document.body.style.overflow = narrow ? 'auto' : 'hidden';
+    document.body.classList.toggle('paged', narrow);
 
     if (narrow) {
-      const s = window.innerWidth / (PAGE_W + PAD);
-      zoom.style.transform = `scale(${s})`;
-      zoom.style.left = '0px';
-      zoom.style.top = '0px';
-      // transform은 레이아웃 크기를 안 바꾼다. 스크롤 범위를 배율에 맞춰 잡아준다.
-      zoom.style.width = (PAGE_W + PAD) + 'px';
-      document.body.style.height = (spread.offsetHeight * s) + 'px';
+      // 한 화면 = 한 페이지. 종이 전체가 화면 안에 들어오는 배율을 잡고,
+      // 슬라이드마다 뷰포트 높이를 입혀 스와이프 한 번에 한 장씩 넘어가게 한다.
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const s = Math.min((vw - 12) / PAGE_W, (vh - 16) / PAGE_H);
+      document.documentElement.style.scrollSnapType = 'y mandatory';
+      for (const sl of slides) {
+        sl.style.width = vw + 'px';
+        sl.style.height = vh + 'px';
+        const page = sl.querySelector('.page');
+        page.style.transform = `scale(${s})`;
+        page.style.transformOrigin = 'center center';
+      }
+      document.body.style.height = '';
+      zoom.style.left = '';
+      zoom.style.top = '';
+      zoom.style.width = '';
       return;
     }
 
+    // 데스크톱 — 두 면 펼침을 화면에 맞춘다
+    document.documentElement.style.scrollSnapType = '';
+    document.body.style.overflow = 'hidden';
+    for (const sl of slides) {
+      sl.style.width = '';
+      sl.style.height = '';
+      const page = sl.querySelector('.page');
+      page.style.transform = '';
+      page.style.transformOrigin = '';
+    }
     const W = PAGE_W * 2 + 28 + PAD;
-    const H = 905 + PAD;
+    const H = PAGE_H + PAD;
     document.body.style.height = '';
     zoom.style.width = '';
-    const s = Math.min(window.innerWidth / W, window.innerHeight / H);
-    zoom.style.transform = `scale(${s})`;
-    zoom.style.left = Math.max(0, (window.innerWidth - W * s) / 2) + 'px';
-    zoom.style.top = Math.max(0, (window.innerHeight - H * s) / 2) + 'px';
+    zoom.style.transform = `scale(${Math.min(window.innerWidth / W, window.innerHeight / H)})`;
+    zoom.style.left = Math.max(0, (window.innerWidth - W * Math.min(window.innerWidth / W, window.innerHeight / H)) / 2) + 'px';
+    zoom.style.top = Math.max(0, (window.innerHeight - H * Math.min(window.innerWidth / W, window.innerHeight / H)) / 2) + 'px';
   }
   window.addEventListener('resize', fit);
   fit();
