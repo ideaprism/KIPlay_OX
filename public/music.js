@@ -73,6 +73,33 @@
     },
 
     /**
+     * 접속 직후의 자동 재생 시도.
+     *
+     * 링크를 열고 게임 화면이 뜨면 잠깐 뒤 로고송이 울린다. 브라우저가 제스처 없는
+     * 재생을 막으면(대부분의 폰이 그렇다) 조용히 물러났다가, 첫 터치·키 입력에서
+     * 곧바로 이어서 튼다. 어느 쪽이든 게임은 멈추지 않는다.
+     */
+    autoJingle(delayMs) {
+      setTimeout(() => {
+        enabled = true;
+        for (const a of Object.values(players)) a.load();
+        lastLobbyStart = Date.now();
+        const a = players.lobby;
+        try { a.currentTime = 0; } catch (e) { /* 메타데이터 전이면 그냥 처음부터 */ }
+        a.play().catch(() => {
+          const once = () => {
+            document.removeEventListener('pointerdown', once);
+            document.removeEventListener('keydown', once);
+            lastLobbyStart = Date.now();
+            playFromTop('lobby');
+          };
+          document.addEventListener('pointerdown', once);
+          document.addEventListener('keydown', once);
+        });
+      }, delayMs || 1000);
+    },
+
+    /**
      * 로고송을 지금 즉시 한 번. 1분 주기 가드를 무시한다.
      * 체험 시작처럼 "새로 시작한다"는 순간에는 최근에 울렸더라도 다시 울려야 한다.
      */

@@ -904,6 +904,9 @@ document.addEventListener('keydown', (e) => {
 
 const fixtureName = new URLSearchParams(location.search).get('screen');
 
+// 링크를 열면 1초 뒤 개장 로고송을 시도한다. 픽스처 화면은 개발용이라 조용히 둔다.
+if (!fixtureName) Music.autoJingle(1000);
+
 // 저장된 토큰이 아직 살아 있는지 먼저 확인한다.
 // 죽은 토큰으로 스트림을 열면 계속 재접속만 시도하며 화면이 멈춘 것처럼 보인다.
 // 픽스처로 화면만 보는 중이면 건드리지 않는다.

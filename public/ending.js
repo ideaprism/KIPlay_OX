@@ -41,23 +41,19 @@
     body: 3500,     // (57) 요약
     fig: 4400,      // 대표도 — 우승자 옥상 사시도
     stamp: 5000,    // 인주 도장
-    hold: 8000,
-    out: 8400,
   };
+  // 카드는 스스로 걷히지 않는다. 우승곡이 끝나도 화면은 그대로 남는다 ——
+  // 캡처하고, 돌려 보고, 이야기할 시간이다. 누르면 넘어가고, 다음 회차가 열리면 걷힌다.
 
   class EndingCard {
-    /**
-     * @param {HTMLElement} root  전체를 덮는 오버레이. 안에 canvas 하나가 있어야 한다.
-     * @param {object} opts  { hold } 전광판은 더 오래 머문다.
-     */
-    constructor(root, opts) {
+    /** @param {HTMLElement} root  전체를 덮는 오버레이. 안에 canvas 하나가 있어야 한다. */
+    constructor(root) {
       this.root = root;
       this.canvas = root.querySelector('canvas');
       // 캔버스를 불투명(alpha:false)으로 잡으면 크롬이 글자에 LCD 서브픽셀 안티앨리어싱을
       // 쓴다. 그러면 검은 글자 가장자리에 주황·보라 색테가 생긴다. 컬러 화면에서는 안 보이지만
       // 먹과 종이만 쓰는 도면에서는 그 색테가 그대로 눈에 띈다. alpha:true면 회색조로 떨어진다.
       this.ctx = this.canvas.getContext('2d', { alpha: true });
-      this.holdExtra = (opts && opts.hold) || 0;
 
       this.champ = null;
       this.t0 = 0;
@@ -97,11 +93,6 @@
       this.t0 = performance.now();
       if (!this.raf) this.raf = requestAnimationFrame(this.frame.bind(this));
 
-      // rAF만 믿으면 안 된다. 탭이 배경에 있는 동안에는 rAF가 아예 돌지 않아서
-      // 카드가 화면을 덮은 채 영영 멈춘다. 시계로 한 번 더 걸어둔다.
-      clearTimeout(this.timer);
-      this.timer = setTimeout(() => this.finish(), T.out + this.holdExtra + 400);
-
       try { this.root.focus({ preventScroll: true }); } catch (e) { /* 없어도 된다 */ }
     }
 
@@ -125,9 +116,7 @@
     frame(now) {
       if (!this.champ) return;
       this.raf = requestAnimationFrame(this.frame.bind(this));
-      const t = now - this.t0;
-      if (t >= T.out + this.holdExtra) { this.finish(); return; }
-      this.draw(t, now);
+      this.draw(now - this.t0, now);
     }
 
     draw(t, now) {
@@ -148,7 +137,6 @@
       const ox = (W - pageW) / 2;
       const oy = (H - pageH) / 2;
 
-      const hold = this.holdExtra;
       const u = pageW / 100;   // 지면 폭을 100으로 놓은 단위. 어느 화면에서도 같은 비례가 된다.
 
       if (t > T.paper) this.drawSheet(c, ox, oy, pageW, pageH, u, t);
@@ -159,15 +147,7 @@
       if (t > T.fig) this.drawRepFigure(c, ox, oy, pageW, pageH, u, now, t);
       if (t > T.stamp) seal(c, ox + pageW * 0.845, oy + pageH * 0.905, u * 7, '登', t - T.stamp);
 
-      // 걷힐 때는 종이가 위로 빠진다
-      const outT = T.hold + hold;
-      if (t > outT) {
-        const k = clamp((t - outT) / (T.out - T.hold), 0, 1);
-        c.fillStyle = P.paper;
-        c.fillRect(0, 0, W, H * k * 1.05);
-      }
-
-      if (t > T.stamp + 900 && t < outT) {
+      if (t > T.stamp + 900) {
         c.textAlign = 'center';
         c.textBaseline = 'bottom';
         c.fillStyle = P.light;

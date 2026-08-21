@@ -69,7 +69,7 @@ function playEnding(s) {
   if (!r || !r.champion || endingDone) return;
   if (!window.EndingCard || !$('ending')) return;
   endingDone = true;
-  if (!endingCard) endingCard = new window.EndingCard($('ending'), { hold: 3000 });
+  if (!endingCard) endingCard = new window.EndingCard($('ending'));
   Music.crown();   // 우승 확정 즉시. 곡의 좋은 부분을 기다리게 하지 않는다.
   endingCard.show(Object.assign({
     name: r.champion.name,
@@ -443,6 +443,10 @@ function connect() {
 }
 
 // ─────────────────────────────────────────── 부팅
+
+// 전광판도 접속 1초 뒤 로고송을 시도한다. 키오스크처럼 자동재생이 허용된 환경이면
+// 게이트를 누르기 전부터 개장 분위기가 잡힌다. 막히면 게이트 클릭이 받는다.
+Music.autoJingle(1000);
 
 $('audio-go').addEventListener('click', () => {
   audioReady = Sfx.unlock();
