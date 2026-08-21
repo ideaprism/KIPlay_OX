@@ -7,3 +7,6 @@ node_modules/
 Thumbs.db
 .adminkey
 .tunnel*
+
+# 문제 은행 백업본은 로컬에만 둔다
+data/*.backup.*.json

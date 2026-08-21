@@ -46,7 +46,7 @@
       <div class="chips">
         <button class="chip" type="button" data-role="new" aria-pressed="true">🌱 신입 · 부활권 1개</button>
         <button class="chip" type="button" data-role="normal" aria-pressed="false">일반 직원</button>
-        <button class="chip" type="button" data-role="vip" aria-pressed="false">👑 원장</button>
+        <button class="chip" type="button" data-role="vip" aria-pressed="false">👑 스페셜 참가자</button>
       </div>
     </div>
 
@@ -79,6 +79,7 @@
 
 <!-- ══════════════════════════════════ 대기실 -->
 <section class="screen" id="s-lobby">
+  <p class="greeting" id="lobby-greet" role="status" aria-live="polite"></p>
   <div class="label" style="text-align:center">시작까지</div>
 
   <div class="dial">
@@ -140,7 +141,7 @@
   <p class="caption" id="caption" role="status" aria-live="polite"></p>
 
   <div class="badge-legend" aria-hidden="true">
-    <span>👑 <b>임원</b></span>
+    <span>👑 <b>스페셜 참가자</b></span>
     <span>🌱 <b>2년차 미만 · 부활권</b></span>
     <span>⚪ <b>나</b></span>
   </div>
@@ -199,6 +200,10 @@
     <span class="qnum mono">Q <b id="w-index">01</b> / <span id="w-total">05</span></span>
     <span class="alive-chip mono"><i class="dot"></i><span id="w-alive">0</span> 생존</span>
   </header>
+
+  <div class="qbody">
+    <h1 class="qtext qtext-sm" id="w-text" aria-live="polite"></h1>
+  </div>
 
   <div class="watch-body">
     <span class="dead-mark">탈락</span>
@@ -265,6 +270,9 @@
   <div class="label">순위</div>
   <div class="rank-list" id="rs-ranking"></div>
 
+  <div class="label">문항 복기</div>
+  <div class="review-list" id="rs-review"></div>
+
   <div class="demo-actions" style="margin-top:16px">
     <button class="btn btn-primary" id="rs-replay" hidden>한 판 더</button>
     <button class="btn" id="rs-again">대기실로</button>
@@ -275,6 +283,7 @@
   <canvas id="ending-canvas"></canvas>
 </div>
 
+<script src="music.js"></script>
 <script src="roofimage.js"></script>
 <script src="crowd.js"></script>
 <script src="ending.js"></script>

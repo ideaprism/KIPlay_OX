@@ -21,6 +21,7 @@ let lastPhase = null;
 let lastQIndex = -1;
 let countdownAt = null;
 let sceneLocked = false;
+let suddenArmTimer = null;
 
 const now = () => Date.now() + clockOffset;
 const pad2 = (n) => String(n).padStart(2, '0');
@@ -52,7 +53,7 @@ function buildGazette(s, r) {
   const d = new Date(s.serverNow || Date.now());
   const yy = d.getFullYear();
   const pubDate = `${yy}년${String(d.getMonth() + 1).padStart(2, '0')}월${String(d.getDate()).padStart(2, '0')}일`;
-  const runnerUp = (r.ranking && r.ranking[1] && r.ranking[1].name) || '원장실';
+  const runnerUp = (r.ranking && r.ranking[1] && r.ranking[1].name) || '심사부';
 
   return {
     regNo: `10-30${String(hash % 100000).padStart(5, '0')}`,
@@ -69,6 +70,7 @@ function playEnding(s) {
   if (!window.EndingCard || !$('ending')) return;
   endingDone = true;
   if (!endingCard) endingCard = new window.EndingCard($('ending'), { hold: 3000 });
+  Music.crown();   // 우승 확정 즉시. 곡의 좋은 부분을 기다리게 하지 않는다.
   endingCard.show(Object.assign({
     name: r.champion.name,
     dept: r.champion.dept,
@@ -128,8 +130,11 @@ function startLoop() { if (!rafId) rafId = requestAnimationFrame(loop); }
 function stopLoop() { if (rafId) cancelAnimationFrame(rafId); rafId = null; }
 
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden) { stopLoop(); if (stage) stage.stop(); }
-  else { startLoop(); if (stage) stage.start(); }
+  if (document.hidden) { stopLoop(); if (stage) stage.stop(); Music.stopAll(); }
+  else {
+    startLoop(); if (stage) stage.start();
+    if (snap && (snap.phase === 'idle' || snap.phase === 'lobby')) Music.lobby(true);
+  }
 });
 
 // ─────────────────────────────────────────── 렌더
@@ -298,6 +303,8 @@ function render(s) {
       $('b-center-sub').textContent = '매주 월요일 점심시간 마지막 5분';
       $('b-center-list').hidden = true;
       lastQIndex = -1;
+      Music.stopCrown();
+      Music.lobby(true);
       break;
 
     case 'lobby':
@@ -311,10 +318,13 @@ function render(s) {
       $('b-center-list').hidden = true;
       endingDone = false;   // 다음 회차의 엔딩을 위해 되돌린다
       if (endingCard) endingCard.finish();
+      Music.stopCrown();
+      Music.lobby(true);
       break;
 
     case 'question':
       showCenter(false);
+      Music.lobby(false);   // 게임이 시작됐다. 로고송 예약을 멈춘다.
       $('b-split').hidden = false;
       $('b-question').textContent = s.question ? s.question.text : '';
       $('b-drop').textContent = '';
@@ -350,10 +360,20 @@ function render(s) {
 
     case 'sudden':
       showCenter(false);
-      $('b-question').textContent = s.sudden ? s.sudden.text : '';
       $('b-drop').textContent = 'SUDDEN DEATH';
       $('b-split').hidden = true; // 서든데스는 O/X가 아니라 숫자 입력이다
-      if (phaseChanged && audioReady) Sfx.gong({ freq: 74, gain: 0.55 });
+      if (phaseChanged) {
+        // 뜸을 살짝 들인다. armAt에 우승곡이 흐르면서 최종 문제가 공개되고,
+        // 20초 뒤 우승이 확정되는 순간이 곡의 클라이맥스와 겹친다.
+        $('b-question').textContent = '';
+        if (audioReady) Sfx.gong({ freq: 74, gain: 0.55 });
+        clearTimeout(suddenArmTimer);
+        suddenArmTimer = setTimeout(() => {
+          if (!snap || snap.phase !== 'sudden') return;
+          Music.crown();
+          $('b-question').textContent = s.sudden ? s.sudden.text : '';
+        }, Math.max(0, (s.armAt || 0) - now()));
+      }
       break;
 
     case 'result': {
@@ -426,6 +446,10 @@ function connect() {
 
 $('audio-go').addEventListener('click', () => {
   audioReady = Sfx.unlock();
+  Music.enable();
+  // 게이트를 누르기 전에 이미 대기 상태가 와 있었을 수 있다. idle에서는 새 상태
+  // 이벤트가 오지 않으므로, 여기서 직접 현재 위상에 맞춰 시동을 건다.
+  if (snap && (snap.phase === 'idle' || snap.phase === 'lobby')) Music.lobby(true);
   Sfx.gong({ gain: 0.35 });
   setTimeout(() => Sfx.say('전광판 준비 완료.'), 700);
   $('audio-gate').hidden = true;

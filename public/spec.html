@@ -347,15 +347,35 @@
   const PAGE_H = 905;
   const slides = Array.from(document.querySelectorAll('.slide'));
 
+  /**
+   * 폰 판정.
+   *
+   * innerWidth만 보면 안 된다. 폰 브라우저가 새 창을 열 때 레이아웃 뷰포트를
+   * 잠깐 데스크톱 폭(~980)으로 보고하는 경우가 있고, 그 순간의 판정이 데스크톱
+   * 경로로 굳으면 화면 왼쪽 위 구석만 보이는 검은 화면이 된다 —— 실제로 그랬다.
+   * screen.width는 폰에서 기기 폭을 그대로 말하므로 둘 중 작은 쪽을 믿는다.
+   * (데스크톱은 모니터가 창보다 크므로 innerWidth가 그대로 이긴다.)
+   */
+  function isNarrow() {
+    const sw = (window.screen && window.screen.width) || Infinity;
+    return Math.min(window.innerWidth || Infinity, sw) < 720;
+  }
+
+  let wasNarrow = null;
+
   function fit() {
     if (!window.innerWidth || !window.innerHeight) return; // 숨겨진 창에서 scale(0)이 되는 것 방지
-    const narrow = window.innerWidth < 720;
+    const narrow = isNarrow();
     document.body.classList.toggle('paged', narrow);
+    // 경로가 바뀌는 순간에는 1페이지 머리로 되돌린다 — 이전 스크롤 위치는 의미가 없다
+    if (wasNarrow !== null && wasNarrow !== narrow) window.scrollTo(0, 0);
+    wasNarrow = narrow;
 
     if (narrow) {
       // 한 화면 = 한 페이지. 종이 전체가 화면 안에 들어오는 배율을 잡고,
       // 슬라이드마다 뷰포트 높이를 입혀 스와이프 한 번에 한 장씩 넘어가게 한다.
-      const vw = window.innerWidth;
+      // 폰이 innerWidth를 넓게 거짓말하는 중이면 기기 폭으로 잡는다.
+      const vw = Math.min(window.innerWidth, (window.screen && window.screen.width) || window.innerWidth);
       const vh = window.innerHeight;
       const s = Math.min((vw - 12) / PAGE_W, (vh - 16) / PAGE_H);
       document.documentElement.style.scrollSnapType = 'y mandatory';
@@ -392,7 +412,14 @@
     zoom.style.top = Math.max(0, (window.innerHeight - H * Math.min(window.innerWidth / W, window.innerHeight / H)) / 2) + 'px';
   }
   window.addEventListener('resize', fit);
+  window.addEventListener('orientationchange', fit);
+  window.addEventListener('pageshow', fit);
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', fit);
   fit();
+  // 새 창의 뷰포트는 늦게 자리 잡는다. 첫 판정이 틀렸어도 스스로 바로잡게
+  // 조금 뒤에 두 번 더 재판정한다 — resize 이벤트는 이때 안 와줄 수 있다.
+  setTimeout(fit, 250);
+  setTimeout(fit, 1000);
 })();
 </script>
 </body>

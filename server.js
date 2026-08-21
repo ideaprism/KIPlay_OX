@@ -38,6 +38,12 @@ const CONFIG = {
    * 문항 수나 중계 문구를 바꾸면 이 값도 같이 봐야 한다.
    */
   armMs: Number(process.env.ARM_MS) || 3400,
+
+  /**
+   * 서든데스 브리핑. 뜸을 살짝 들였다가 우승곡이 울리면서 문제가 공개된다.
+   * 그 20초 뒤 우승이 확정되는 순간이 곡의 클라이맥스와 겹치도록 설계된 값이다.
+   */
+  suddenArmMs: Number(process.env.SUDDEN_ARM_MS) || 2200,
   revealMs: 3000,     // 정답 공개 (아래 revealMsFor로 인원에 따라 늘어난다)
   reviveMs: 4000,     // 부활권 선택
   suddenMs: 20000,    // 서든데스
@@ -220,7 +226,7 @@ function scheduleBotSudden(participants) {
   const target = game.suddenQ.answer;
   for (const p of participants) {
     if (!p.isBot) continue;
-    laterBot(1200 + Math.random() * (CONFIG.suddenMs - 3000), () => {
+    laterBot(CONFIG.suddenArmMs + 1200 + Math.random() * (CONFIG.suddenMs - 3000), () => {
       if (game.phase !== 'sudden') return;
       const spread = 0.12 + Math.random() * 0.7;
       const sign = Math.random() < 0.5 ? -1 : 1;
@@ -425,7 +431,7 @@ function publicState() {
     tallyVisible: showTally,
     tallyFrom: CONFIG.tallyVisibleFrom,
     questionMs: CONFIG.questionMs,
-    armAt: game.phase === 'question' ? game.armAt : null,
+    armAt: game.phase === 'question' || game.phase === 'sudden' ? game.armAt : null,
     suddenMs: CONFIG.suddenMs,
     divAlive: divisionCounts(),
     divisionNames: DIVISIONS.map((d) => ({ id: d.id, name: d.name, short: d.short || d.name })),
@@ -695,7 +701,9 @@ function nextStep() {
 function beginSudden(participants) {
   clearTimers();
   game.phase = 'sudden';
-  game.phaseEndsAt = Date.now() + CONFIG.suddenMs;
+  // 뜸 구간. 문제는 armAt에 공개되고 그때 우승곡이 함께 흐른다.
+  game.armAt = Date.now() + CONFIG.suddenArmMs;
+  game.phaseEndsAt = game.armAt + CONFIG.suddenMs;
 
   for (const p of game.players.values()) {
     p.suddenValue = null;
@@ -709,7 +717,7 @@ function beginSudden(participants) {
 
   pushState();
   scheduleBotSudden(participants);
-  schedule(CONFIG.suddenMs, resolveSudden);
+  schedule(CONFIG.suddenArmMs + CONFIG.suddenMs, resolveSudden);
 }
 
 function resolveSudden() {
@@ -784,7 +792,18 @@ function finish(champion) {
     scene: 'ground',
     ranking,
     sudden: game.suddenResult || null,
-    suddenAnswer: game.suddenQ ? { value: game.suddenQ.answer, unit: game.suddenQ.unit, evidence: game.suddenQ.evidence } : null,
+    suddenAnswer: game.suddenQ
+      ? { text: game.suddenQ.text, value: game.suddenQ.answer, unit: game.suddenQ.unit, evidence: game.suddenQ.evidence }
+      : null,
+    // 문항 복기 — 회차가 끝난 뒤 무엇이 나왔고 왜 그 답인지 돌아볼 수 있어야 한다
+    review: game.questions.map((q, i) => ({
+      n: i + 1,
+      text: q.text,
+      answer: q.answer,
+      difficulty: q.difficulty,
+      evidence: q.evidence || '',
+      source: (q.source && q.source.title) || '',
+    })),
     vip: vip ? { name: vip.name, title: vip.title, survived: vip.survived } : null,
     vipBeaten: vipBeaten.map((p) => ({ name: p.name, dept: p.dept })),
     totalPlayers: all.length,
@@ -831,6 +850,9 @@ const MIME = {
   '.json': 'application/json; charset=utf-8',
   '.svg': 'image/svg+xml',
   '.ico': 'image/x-icon',
+  '.png': 'image/png',
+  '.wav': 'audio/wav',
+  '.mp3': 'audio/mpeg',
 };
 
 function sendJson(res, code, obj) {
@@ -865,9 +887,11 @@ function serveStatic(req, res, pathname) {
       res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
       return res.end('404');
     }
+    // 음원은 무겁고 바뀌지 않는다. 매 접속마다 20MB를 다시 받게 하지 않는다.
+    const heavy = /\.(wav|mp3|png)$/.test(file);
     res.writeHead(200, {
       'Content-Type': MIME[path.extname(file)] || 'application/octet-stream',
-      'Cache-Control': 'no-cache',
+      'Cache-Control': heavy ? 'public, max-age=86400' : 'no-cache',
     });
     res.end(buf);
   });
@@ -1014,6 +1038,7 @@ async function handler(req, res) {
     const player = game.players.get(body.token);
     if (!player) return sendJson(res, 401, { error: 'invalid token' });
     if (game.phase !== 'sudden' || !player.inSudden) return sendJson(res, 409, { error: 'not participant' });
+    if (game.armAt && Date.now() < game.armAt - 250) return sendJson(res, 409, { error: 'not armed' });
     const v = Number(body.value);
     if (!Number.isFinite(v)) return sendJson(res, 400, { error: 'bad value' });
     player.suddenValue = v;

@@ -56,7 +56,7 @@
   ],
 
   "roster": [
-    { "empId": "95001", "name": "김원장", "dept": "원장실", "joinYear": 1995, "vip": true, "title": "원장" },
+    { "empId": "95001", "name": "김원장", "dept": "원장실", "joinYear": 1995, "vip": true, "title": "스페셜 참가자" },
     { "empId": "03014", "name": "박운영", "dept": "경영지원실", "joinYear": 2003, "vip": true, "title": "경영관리본부장" },
 
     { "empId": "05021", "name": "이정보", "dept": "IP정보확산실", "joinYear": 2005 },

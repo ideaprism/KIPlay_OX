@@ -125,7 +125,11 @@ async function join(empId, strategy) {
       await post('/api/revive', { token: p.token, use });
     }
 
-    if (s.phase === 'sudden' && s.me.inSudden && p.suddenValue !== undefined) {
+    if (s.phase === 'sudden' && s.me.inSudden && p.suddenValue !== undefined && !p.suddenSent) {
+      p.suddenSent = true;
+      // 서든데스도 브리핑(뜸) 뒤에 문이 열린다. 그전 제출은 409로 거절된다.
+      const wait = (s.armAt || 0) - Date.now();
+      if (wait > 0) await sleep(wait + 150);
       await post('/api/sudden', { token: p.token, value: p.suddenValue, rt: p.suddenRt || 3000 });
     }
   });

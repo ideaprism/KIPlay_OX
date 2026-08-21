@@ -974,3 +974,62 @@ body[data-demo="1"] .screen {
 
 /* 브리핑 중 시계는 채워져 있되 대기 중임이 보여야 한다 */
 .timer.arming .fill { background: var(--line-2); }
+
+/* ── 관전 화면의 문항. 참여 화면보다 한 단계 작게. */
+.qtext-sm { font-size: clamp(16px, 4.4vw, 24px); line-height: 1.4; }
+
+/* ── 문항 복기 ────────────────────────────────────────────────
+   회차가 끝난 뒤 문제·정답·근거를 돌아보는 자리. 점심 대화가 여기서 나온다. */
+#s-result { overflow-y: auto; }
+
+.review-list { display: flex; flex-direction: column; gap: 6px; }
+
+.review-item {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+}
+.review-item summary {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+  list-style: none;
+}
+.review-item summary::-webkit-details-marker { display: none; }
+.review-item .rv-n { font-size: 11px; color: var(--ink-3); flex: 0 0 auto; }
+.review-item .rv-a {
+  font-family: var(--serif);
+  font-weight: 700;
+  font-size: 15px;
+  flex: 0 0 auto;
+  color: var(--amber-deep);   /* 정답 표기는 판정이다. 인주가 허락되는 자리. */
+}
+.review-item .rv-t {
+  font-family: var(--serif);
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--ink);
+}
+.review-item .rv-body { padding: 0 12px 11px 12px; border-top: 1px dashed var(--line); }
+.review-item .rv-body p {
+  font-family: var(--serif);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ink-2);
+  margin: 9px 0 4px;
+}
+.review-item .rv-body .src { font-size: 11px; color: var(--ink-3); }
+
+/* ── 입장 인사. 대기실 맨 위에서 한 줄, 명조로. */
+.greeting {
+  margin: 0 0 4px;
+  font-family: var(--serif);
+  font-size: 15px;
+  line-height: 1.5;
+  text-align: center;
+  color: var(--ink);
+  min-height: 1.5em;
+  text-wrap: balance;
+}

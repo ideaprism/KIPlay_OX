@@ -14,6 +14,13 @@
   const DIFF_KO = { easy: '쉬움', medium: '보통', hard: '어려움' };
   const SPOKEN = { O: '오', X: '엑스' };
 
+  /**
+   * 서수. "2번 문항"이라고 쓰면 TTS가 "이번 문항"으로 읽는다 —— '이번(this)'과
+   * 구분이 안 되는 진짜 오독이다. "두 번째 문항"으로 읽게 한다.
+   */
+  const ORDINAL = ['첫', '두', '세', '네', '다섯', '여섯', '일곱', '여덟', '아홉', '열'];
+  const ordinal = (i) => (ORDINAL[i] ? `${ORDINAL[i]} 번째` : `${i + 1}번째`);
+
   /** 본부별 생존자를 많은 순으로 정리한다. */
   function divisionRank(s) {
     const counts = s.divAlive || {};
@@ -51,7 +58,7 @@
       const threshold = s.tallyFrom || 30;
 
       if (phaseChanged && s.phase === 'lobby') {
-        out.push({ text: `잠시 후 시작합니다. 현재 ${s.joined}명 입장.`, tone: 'calm' });
+        out.push({ text: `잠시 후 시작합니다. 지금까지 ${s.joined}명이 입장했습니다.`, tone: 'calm' });
       }
 
       if (s.phase === 'question' && s.qIndex !== this.lastQIndex) {
@@ -60,12 +67,12 @@
         const first = s.qIndex === 0;
         out.push({
           text: first
-            ? `첫 문항입니다. 난이도 ${DIFF_KO[d] || '쉬움'}.`
-            : `${s.qIndex + 1}번 문항. 난이도 ${DIFF_KO[d] || ''}.`,
+            ? `첫 번째 문항입니다. 난이도는 ${DIFF_KO[d] || '쉬움'}입니다.`
+            : `${ordinal(s.qIndex)} 문항입니다. 난이도는 ${DIFF_KO[d] || '보통'}입니다.`,
           tone: 'cue',
         });
         if (!first && alive > 0 && alive <= 10) {
-          out.push({ text: `남은 인원 ${alive}명.`, tone: 'calm' });
+          out.push({ text: `${alive}명 남았습니다.`, tone: 'calm' });
         }
       }
 
@@ -78,12 +85,12 @@
         });
 
         if (r.alive === 0) {
-          out.push({ text: '전원 탈락했습니다.', tone: 'bad' });
+          out.push({ text: '전원 탈락입니다.', tone: 'bad' });
         } else if (r.eliminatedCount === 0) {
-          out.push({ text: `전원 통과. ${r.alive}명 모두 살아남았습니다.`, tone: 'good' });
+          out.push({ text: `전원 정답입니다. ${r.alive}명 모두 살아남았습니다.`, tone: 'good' });
         } else {
           out.push({
-            text: `${r.eliminatedCount}명 탈락. ${r.alive}명이 남았습니다.`,
+            text: `${r.eliminatedCount}명이 탈락해 ${r.alive}명이 남았습니다.`,
             tone: 'bad',
           });
         }
@@ -93,7 +100,7 @@
       if (!this.saidThreshold && alive > 0 && alive < threshold && s.phase !== 'idle') {
         this.saidThreshold = true;
         out.push({
-          text: `이제부터 다른 사람의 선택은 보이지 않습니다. 스스로 판단하세요.`,
+          text: '이제부터는 다른 사람의 선택이 보이지 않습니다. 혼자 판단하셔야 합니다.',
           tone: 'rule',
         });
       }
@@ -104,8 +111,8 @@
         if (rank.length) {
           const breakdown = rank.map((d) => `${d.short} ${d.n}명`).join(', ');
           const lead = rank.length > 1 && rank[0].n === rank[1].n
-            ? `${rank[0].n}명씩으로 팽팽합니다.`
-            : `${rank[0].name}가 ${rank[0].n}명으로 가장 많습니다.`;
+            ? `${rank[0].n}명씩 팽팽합니다.`
+            : `${rank[0].name}이 ${rank[0].n}명으로 가장 많습니다.`;
           out.push({ text: `${breakdown}. ${lead}`, tone: 'calm' });
         }
       }
@@ -113,17 +120,17 @@
       // ── VIP 탈락
       if (!this.saidVipOut && s.vip && s.vip.alive === false && s.phase !== 'idle') {
         this.saidVipOut = true;
-        out.push({ text: `${s.vip.title || 'VIP'} ${s.vip.name} 탈락하셨습니다.`, tone: 'bad' });
+        out.push({ text: `${s.vip.title || 'VIP'} ${s.vip.name}님이 탈락하셨습니다.`, tone: 'bad' });
       }
 
       // ── 결승
       if (!this.saidFinal && alive === 2 && (s.phase === 'reveal' || s.phase === 'question')) {
         this.saidFinal = true;
-        out.push({ text: '결승입니다. 단 두 명 남았습니다.', tone: 'cue' });
+        out.push({ text: '결승입니다. 이제 두 명 남았습니다.', tone: 'cue' });
       }
 
       if (phaseChanged && s.phase === 'sudden') {
-        out.push({ text: '서든데스. 정답에 가장 가까운 숫자가 이깁니다.', tone: 'cue' });
+        out.push({ text: '서든데스입니다. 정답에 가장 가까운 숫자를 낸 사람이 이깁니다.', tone: 'cue' });
       }
 
       if (phaseChanged && s.phase === 'result' && s.result) {
@@ -131,10 +138,10 @@
         out.push(
           r.champion
             ? { text: `오늘의 챔피언은 ${r.champion.dept} ${r.champion.name}님입니다.`, tone: 'good' }
-            : { text: '전원 탈락. 챔피언이 나오지 않았습니다.', tone: 'bad' },
+            : { text: '전원 탈락으로 이번 회차의 챔피언은 없습니다.', tone: 'bad' },
         );
         if (r.champion && r.vipBeaten && r.vipBeaten.length) {
-          out.push({ text: `${r.vipBeaten.length}명이 ${r.vip ? r.vip.title || 'VIP' : 'VIP'}를 넘어섰습니다.`, tone: 'calm' });
+          out.push({ text: `${r.vipBeaten.length}명이 ${r.vip ? r.vip.title || 'VIP' : 'VIP'}보다 오래 살아남았습니다.`, tone: 'calm' });
         }
       }
 

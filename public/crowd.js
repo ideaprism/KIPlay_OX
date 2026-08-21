@@ -496,8 +496,9 @@
       if (!this.sceneLocked && s.scene && this.championIndex === null) this.toScene(s.scene);
       if (s.aliveMask) this.applyAlive(s.aliveMask);
 
-      // 새 문항이 시작되면 살아남은 사람들이 다시 아래 중앙으로 모인다
-      if (s.phase === 'question') {
+      // 새 문항이 시작되면 살아남은 사람들이 다시 아래 중앙으로 모인다.
+      // 서든데스도 마찬가지다 —— 직전 정답 공개의 도장·사선이 남아 있으면 안 된다.
+      if (s.phase === 'question' || s.phase === 'sudden') {
         this.revealSide = null;
         for (const p of this.people) { p.choice = null; p.decided = false; }
       }
@@ -749,6 +750,26 @@
      * 틀린 구역은 사선으로 지워진다. 인주가 등장하는 유일한 순간이고, 그 색이 곧 결과다.
      */
     drawZones(c, W, H, sc) {
+      // 서든데스는 O·X가 아니라 숫자 입력이다. 구역 상자는 윤곽만 남기고,
+      // 무엇을 해야 하는지를 인주색으로 크게 적는다. 판정의 색이 곧 지시가 된다.
+      if (this.phase === 'sudden') {
+        const T = H * BOX.top;
+        const B = H * BOX.bot;
+        c.strokeStyle = P.rule;
+        c.lineWidth = 1;
+        for (const side of ['O', 'X']) {
+          const L = W * (side === 'O' ? BOX.oL : BOX.xL);
+          const R = W * (side === 'O' ? BOX.oR : BOX.xR);
+          c.strokeRect(px(L), px(T), Math.round(R - L), Math.round(B - T));
+        }
+        c.fillStyle = P.seal;
+        c.textAlign = 'center';
+        c.textBaseline = 'middle';
+        c.font = `700 ${Math.round(clamp((B - T) * 0.22, 16, 64))}px "Nanum Myeongjo", Batang, 바탕, serif`;
+        c.fillText('숫 자  입 력', W / 2, (T + B) / 2);
+        return;
+      }
+
       // 도장이 언제 찍혔는지 —— 눌렸다 떨어지는 맛을 주려고 잰다
       if (this.revealSide && this.sealAt === null) this.sealAt = performance.now();
       if (!this.revealSide) this.sealAt = null;
@@ -795,6 +816,7 @@
 
     drawPeople(c, t) {
       const tier = tierFor(this.alive || this.n);
+      const pendingLabels = [];
       const baseR = this.r || radiusFor(this.alive || this.n, this.h, this.compact ? 0.032 : 0.020);
       const namedMap = this.named ? new Map(this.named.map((x) => [x.i, x])) : null;
 
@@ -862,22 +884,30 @@
 
         if (tier >= 3 && p.alive && namedMap) {
           const info = namedMap.get(p.i);
-          if (info) {
-            c.globalAlpha = 1;
-            c.textAlign = 'center';
-            c.textBaseline = 'top';
-            c.fillStyle = P.ink;
-            c.font = `500 ${Math.max(7, r * 0.75)}px "Nanum Myeongjo", Batang, 바탕, serif`;
-            c.fillText(tier >= 4 ? info.name : info.empId, X, Y + r * 0.4);
-            if (tier >= 4) {
-              c.fillStyle = P.mid;
-              c.font = `${Math.max(6, r * 0.58)}px ui-monospace, monospace`;
-              c.fillText(info.dept, X, Y + r * 1.5);
-            }
-          }
+          if (info) pendingLabels.push({ x: X, y: Y - r * 1.9, name: tier >= 4 ? info.name : info.empId });
         }
       }
       c.globalAlpha = 1;
+
+      /**
+       * 이름표는 도면부호처럼 지시선으로 뺀다.
+       *
+       * 머리 위에 그대로 얹으면 대기 구역에서 서로 겹쳐 아무것도 읽을 수 없다 ——
+       * 실제로 그랬다. 왼쪽 절반은 왼쪽 여백에, 오른쪽 절반은 오른쪽 여백에
+       * 사다리처럼 쌓고, 각자에게서 지시선을 뻗는다. 세로 순서를 y로 맞춰
+       * 지시선이 서로 교차하지 않게 한다.
+       */
+      if (pendingLabels.length) {
+        const fs = Math.max(7, Math.min(10, baseR * 0.62));
+        const step = fs * 1.7;
+        const top = this.h * 0.585;
+        pendingLabels.sort((a, b) => a.x - b.x);
+        const halfN = Math.ceil(pendingLabels.length / 2);
+        const leftG = pendingLabels.slice(0, halfN).sort((a, b) => a.y - b.y);
+        const rightG = pendingLabels.slice(halfN).sort((a, b) => a.y - b.y);
+        leftG.forEach((L, i) => callout(c, L.name, L.x - baseR * 0.5, L.y, this.w * 0.155, top + i * step, fs));
+        rightG.forEach((L, i) => callout(c, L.name, L.x + baseR * 0.5, L.y, this.w * 0.845, top + i * step, fs));
+      }
     }
 
     /**
@@ -987,7 +1017,8 @@
       const cs = Math.max(7, Math.round(Math.min(W, H) * 0.042));
       callout(c, '10', W * 0.36, H * BOX.top, W * 0.425, H * 0.055, cs);
       callout(c, '20', W * 0.64, H * BOX.top, W * 0.575, H * 0.055, cs);
-      callout(c, '30', W * 0.68, H * 0.815, W * 0.80, H * 0.72, cs);
+      // 후반에는 개인 이름표 지시선이 그 자리를 쓴다. 익명 군중 부호는 접는다.
+      if (tierFor(this.alive || this.n) < 3) callout(c, '30', W * 0.68, H * 0.815, W * 0.80, H * 0.72, cs);
 
       // 부호의 설명 — 도면 아래에 늘 붙는 한 줄
       c.textAlign = 'left';

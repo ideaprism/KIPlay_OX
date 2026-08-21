@@ -80,7 +80,7 @@ function buildGazette(s, r) {
   const d = new Date(s.serverNow || Date.now());
   const yy = d.getFullYear();
   const pubDate = `${yy}년${String(d.getMonth() + 1).padStart(2, '0')}월${String(d.getDate()).padStart(2, '0')}일`;
-  const runnerUp = (r.ranking && r.ranking[1] && r.ranking[1].name) || '원장실';
+  const runnerUp = (r.ranking && r.ranking[1] && r.ranking[1].name) || '심사부';
 
   return {
     regNo: `10-30${String(hash % 100000).padStart(5, '0')}`,
@@ -97,6 +97,7 @@ function playEnding(s) {
   if (!window.EndingCard || !$('ending')) return;
   endingDone = true;
   if (!endingCard) endingCard = new window.EndingCard($('ending'));
+  if (s.demo) Music.crown();   // 우승 확정 즉시. 실전은 전광판이 튼다.
   endingCard.show(Object.assign({
     name: r.champion.name,
     dept: r.champion.dept,
@@ -263,7 +264,7 @@ function stopTimerLoop() {
 }
 
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden) stopTimerLoop();
+  if (document.hidden) { stopTimerLoop(); Music.stopAll(); }
   else startTimerLoop();
 });
 
@@ -287,7 +288,7 @@ function render(s) {
   $('me-dept').textContent = me.dept;
   $('me-badges').innerHTML = '';
   if (me.isNew) $('me-badges').insertAdjacentHTML('beforeend', '<span class="badge badge-new">새싹</span>');
-  if (me.isVip) $('me-badges').insertAdjacentHTML('beforeend', '<span class="badge badge-vip">👑 VIP</span>');
+  if (me.isVip) $('me-badges').insertAdjacentHTML('beforeend', '<span class="badge badge-vip">👑 스페셜 참가자</span>');
 
   $('lobby-joined').textContent = s.joined;
   $('lobby-questions').textContent = s.qTotal || 5;
@@ -312,6 +313,7 @@ function render(s) {
 
     case 'lobby':
       setScreen('lobby');
+      if (s.demo) { Music.stopCrown(); Music.lobby(true); } else Music.lobby(false);
       $('lobby-countdown').textContent = fmtClock(s.phaseEndsAt - now());
       lastQIndex = -1;
       endingDone = false;   // 다음 회차의 엔딩을 위해 되돌린다
@@ -320,6 +322,7 @@ function render(s) {
       break;
 
     case 'question': {
+      Music.lobby(false);
       renderTally(s);
       $('q-index').textContent = pad2(s.qIndex + 1);
       $('q-total').textContent = pad2(s.qTotal);
@@ -334,6 +337,8 @@ function render(s) {
         state.answered = null;
         state.lastTickSec = null;
         splitWords($('q-text'), s.question.text);
+        // 관전자도 같은 문제를 본다. 탈락했다고 문제가 안 보이면 구경할 이유가 없다.
+        splitWords($('w-text'), s.question.text);
         const d = s.question.difficulty || 'easy';
         $('q-diff').dataset.d = d;
         $('q-diff-text').textContent = DIFF_KO[d] || d;
@@ -386,13 +391,25 @@ function render(s) {
     case 'sudden': {
       $('sd-alive').textContent = s.alive;
       if (s.sudden && phaseChanged) {
-        splitWords($('sd-text'), s.sudden.text);
-        $('sd-note').textContent = s.sudden.unit
-          ? `단위: ${s.sudden.unit} · 동점이면 더 빨리 낸 사람이 이깁니다.`
-          : '동점이면 더 빨리 낸 사람이 이깁니다.';
+        // 뜸을 살짝 들인다. armAt에 우승곡이 흐르면서 최종 문제가 공개되고,
+        // 20초 뒤 우승이 확정되는 순간이 곡의 클라이맥스와 겹친다.
+        $('sd-text').textContent = '';
+        $('sd-note').textContent = '최종 문제를 준비하고 있습니다…';
         $('sd-value').value = '';
-        $('sd-submit').disabled = false;
-        Sfx.warn();
+        $('sd-submit').disabled = true;
+        $('w-text').textContent = '';
+        clearTimeout(suddenArmTimer);
+        suddenArmTimer = setTimeout(() => {
+          if (!state.snap || state.snap.phase !== 'sudden') return;   // 이미 지나간 회차다
+          if (s.demo) Music.crown();   // 우승곡과 함께 출제. 실전은 전광판이 튼다.
+          splitWords($('sd-text'), s.sudden.text);
+          splitWords($('w-text'), s.sudden.text);
+          $('sd-note').textContent = s.sudden.unit
+            ? `단위: ${s.sudden.unit} · 동점이면 더 빨리 낸 사람이 이깁니다.`
+            : '동점이면 더 빨리 낸 사람이 이깁니다.';
+          $('sd-submit').disabled = false;
+          Sfx.warn();
+        }, Math.max(0, (s.armAt || 0) - now()));
       }
       setScreen(me.inSudden ? 'sudden' : 'watch');
       break;
@@ -438,6 +455,7 @@ function renderTally(s) {
  * 막아두지 않으면 눌러도 409만 돌아와서 먹통처럼 보인다.
  */
 let armTimer = null;
+let suddenArmTimer = null;
 
 function applyArmed(s) {
   const arming = !!(s && s.phase === 'question' && s.armAt && now() < s.armAt);
@@ -477,9 +495,47 @@ function markChoiceResult(answer) {
   no.classList.add('wrong');
 }
 
+
+/**
+ * 문항 복기.
+ *
+ * 회차가 끝난 뒤 무엇이 나왔고 답이 무엇이며 왜 그런지 돌아볼 수 있어야 한다.
+ * 점심 대화는 여기서 나온다 —— "그거 답이 X였어?"
+ */
+function renderReview(r) {
+  const box = $('rs-review');
+  if (!box) return;
+  box.innerHTML = '';
+  for (const q of r.review || []) {
+    const el = document.createElement('details');
+    el.className = 'review-item';
+    el.innerHTML =
+      `<summary><span class="rv-n mono">문 ${q.n}</span>` +
+      `<span class="rv-a ${q.answer === 'O' ? 'rv-o' : 'rv-x'}">${q.answer}</span>` +
+      `<span class="rv-t">${q.text}</span></summary>` +
+      `<div class="rv-body"><p>${q.evidence || '—'}</p>` +
+      (q.source ? `<span class="src mono">근거 · ${q.source}</span>` : '') +
+      `</div>`;
+    box.appendChild(el);
+  }
+  if (r.suddenAnswer && r.suddenAnswer.text) {
+    const sd = r.suddenAnswer;
+    const el = document.createElement('details');
+    el.className = 'review-item';
+    el.innerHTML =
+      `<summary><span class="rv-n mono">서든</span>` +
+      `<span class="rv-a rv-o">${sd.value}${sd.unit || ''}</span>` +
+      `<span class="rv-t">${sd.text}</span></summary>` +
+      `<div class="rv-body"><p>${sd.evidence || '—'}</p></div>`;
+    box.appendChild(el);
+  }
+}
+
 function renderResult(s, me) {
   const r = s.result;
   if (!r) return;
+
+  renderReview(r);
 
   if (r.champion) {
     $('rs-crown').textContent = '👑';
@@ -600,6 +656,7 @@ function connect() {
 $('login-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   Sfx.unlock();                       // 오디오는 첫 사용자 제스처에서 해제한다
+  Music.enable();
   $('login-error').textContent = '';
   $('join-btn').disabled = true;
 
@@ -611,8 +668,35 @@ $('login-form').addEventListener('submit', async (e) => {
   state.token = data.token;
   sessionStorage.setItem('t1255', data.token);
   Sfx.select();
+  greet(data.user.name);
   connect();
 });
+
+/**
+ * 입장 인사. 사번을 넣고 들어온 사람에게 한마디 건넨다.
+ *
+ * 열 가지를 돌리는 이유는 매주 오는 게임이라서다. 매번 같은 인사면 3주차부터
+ * 아무도 읽지 않는다. 자막으로 띄우고 같은 문장을 읽어준다.
+ */
+const GREETINGS = [
+  (n) => `안녕하세요, ${n}님! 맛점 하셨나요? 화이팅!!`,
+  (n) => `${n}님, 어서 오세요. 오늘의 챔피언 자리가 비어 있습니다.`,
+  (n) => `${n}님 입장! 점심시간 마지막 5분, 준비되셨죠?`,
+  (n) => `반갑습니다 ${n}님. 오늘은 왠지 느낌이 좋은데요?`,
+  (n) => `${n}님, 커피 한 잔 들고 오셨나요? 곧 시작합니다.`,
+  (n) => `어서 오세요 ${n}님! 지난주의 아쉬움, 오늘 갚아주세요.`,
+  (n) => `${n}님 등장! 다들 긴장하세요.`,
+  (n) => `${n}님, 딱 다섯 문제입니다. 끝까지 살아남아 보세요.`,
+  (n) => `환영합니다 ${n}님. 소문난 실력, 오늘 보여주시죠.`,
+  (n) => `${n}님! 12시 55분의 주인공이 되실 준비 되셨나요?`,
+];
+
+function greet(name) {
+  const line = GREETINGS[Math.floor(Math.random() * GREETINGS.length)](name);
+  const el = $('lobby-greet');
+  if (el) el.textContent = line;
+  Sfx.say(line);
+}
 
 function setSendState(s, text) {
   const el = $('send-state');
@@ -706,7 +790,7 @@ const demoOpts = { role: 'new', bots: 80, lobby: 3 };
 
 /** 역할별 시연용 사번 (5자리). 명부에 등록된 사번을 그대로 쓴다. */
 function demoEmpId(role) {
-  if (role === 'vip') return '95001';     // 김원장
+  if (role === 'vip') return '95001';     // 스페셜 참가자
   if (role === 'normal') return '15029';  // 임특허 · 11년차
   return '26005';                         // 조새싹 · 0년차 · 부활권 대상
 }
@@ -754,6 +838,7 @@ $('spec-open').addEventListener('click', openSpec);
 
 $('demo-open').addEventListener('click', () => {
   Sfx.unlock();
+  Music.enable();
   $('opt-role').hidden = !!state.token; // 이미 입장했다면 지금 신분을 그대로 쓴다
   $('demo-error').textContent = '';
   setScreen('demo');
@@ -763,6 +848,7 @@ $('demo-back').addEventListener('click', () => setScreen(state.token ? 'lobby' :
 
 $('lobby-demo').addEventListener('click', () => {
   Sfx.unlock();
+  Music.enable();
   $('opt-role').hidden = true;
   $('demo-error').textContent = '';
   setScreen('demo');
@@ -771,6 +857,7 @@ $('lobby-demo').addEventListener('click', () => {
 async function startDemo() {
   $('demo-start').disabled = true;
   $('demo-error').textContent = '';
+  Music.jingle();   // 체험도 개장 로고송으로 시작한다. 1분 가드는 여기선 무시.
 
   try {
     // 아직 입장하지 않았다면 고른 역할로 먼저 입장한다
@@ -868,8 +955,12 @@ if (fixture) {
         { rank: 3, name: '한분석', dept: '데이터실', survived: 4, points: 45, isNew: false, vip: false },
       ],
       sudden: [{ name: '조새싹', value: 1100, diff: 7, rt: 4210 }],
-      suddenAnswer: { value: 1093, unit: '건', evidence: '토머스 에디슨은 미국에서 1,093건의 특허를 취득했다.' },
-      vip: { name: '김원장', title: '원장', survived: 4 },
+      suddenAnswer: { text: '발명왕 에디슨이 생전에 취득한 미국 특허는 모두 몇 건일까?', value: 1093, unit: '건', evidence: '토머스 에디슨은 미국에서 1,093건의 특허를 취득했다.' },
+      review: [
+        { n: 1, text: '특허권의 존속기간은 출원일부터 20년이다.', answer: 'O', difficulty: 'easy', evidence: '특허법 제88조. 존속기간은 설정등록일부터 출원일 후 20년까지다.', source: '특허법 제88조' },
+        { n: 2, text: '코카콜라의 제조법은 특허로 등록되어 있다.', answer: 'X', difficulty: 'medium', evidence: '영업비밀로 관리한다. 특허로 공개하면 20년 뒤 누구나 쓸 수 있다.', source: '영업비밀 제도 안내' },
+      ],
+      vip: { name: '김원장', title: '스페셜 참가자', survived: 4 },
       vipBeaten: [{ name: '조새싹', dept: '정보서비스실' }],
       totalPlayers: 312,
     };
